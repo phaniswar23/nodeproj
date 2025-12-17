@@ -1,0 +1,408 @@
+@import "@fontsource/orbitron/400.css";
+@import "@fontsource/orbitron/700.css";
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Word Imposter - Dark Gaming Theme */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222 47% 6%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 6%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 6%;
+    --primary: 174 72% 35%;
+    /* Darker teal for light mode validity */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 35 90% 50%;
+    --secondary-foreground: 222 47% 6%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 174 72% 35%;
+    --accent-foreground: 222 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 72% 35%;
+    /* Green for light mode */
+    --success-foreground: 222 47% 6%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 174 72% 35%;
+    --radius: 0.75rem;
+    --font-heading: 'Orbitron', sans-serif;
+    --font-body: 'Inter', sans-serif;
+
+    /* Gradients & Glows for Light Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 45%), hsl(174 72% 35%));
+    --gradient-glass: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.6));
+    --glow-primary: 0 0 15px hsl(174 72% 35% / 0.3);
+  }
+
+  .dark {
+    --background: 222 47% 6%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 174 72% 50%;
+    --primary-foreground: 222 47% 6%;
+    --secondary: 35 90% 55%;
+    --secondary-foreground: 222 47% 6%;
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 174 72% 40%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --success: 142 72% 45%;
+    --success-foreground: 222 47% 6%;
+    --border: 222 30% 18%;
+    --input: 222 30% 18%;
+    --ring: 174 72% 50%;
+
+    /* Gradients & Glows for Dark Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 50%), hsl(174 72% 35%));
+    --gradient-glass: linear-gradient(135deg, hsl(222 30% 15% / 0.6), hsl(222 30% 10% / 0.8));
+    --glow-primary: 0 0 20px hsl(174 72% 50% / 0.4);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/60 backdrop-blur-xl border border-border/50 rounded-xl;
+    background: var(--gradient-glass);
+  }
+
+  .glow-primary {
+    box-shadow: var(--glow-primary);
+  }
+
+  .glow-secondary {
+    box-shadow: var(--glow-secondary);
+  }
+
+  .glow-success {
+    box-shadow: var(--glow-success);
+  }
+
+  .text-glow {
+    text-shadow: 0 0 10px currentColor;
+  }
+
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent;
+  }
+
+  .btn-game {
+    @apply relative overflow-hidden font-heading font-bold tracking-wider uppercase;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .btn-game::before {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300;
+    background: linear-gradient(135deg, hsl(174 72% 50% / 0.2), transparent);
+  }
+
+  .btn-game:hover::before {
+    @apply opacity-100;
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.5s ease-out backwards;
+  }
+
+  .animate-spin-slow {
+    animation: spin 8s linear infinite;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 20px hsl(174 72% 50% / 0.4);
+  }
+
+  50% {
+    box-shadow: 0 0 40px hsl(174 72% 50% / 0.6);
+  }
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glitch {
+
+  2%,
+  64% {
+    transform: translate(2px, 0) skew(0deg);
+  }
+
+  4%,
+  60% {
+    transform: translate(-2px, 0) skew(0deg);
+  }
+
+  62% {
+    transform: translate(0, 0) skew(5deg);
+  }
+}
+
+@keyframes glitchTop {
+
+  2%,
+  64% {
+    transform: translate(2px, -2px);
+  }
+
+  4%,
+  60% {
+    transform: translate(-2px, 2px);
+  }
+
+  62% {
+    transform: translate(13px, -1px) skew(-13deg);
+  }
+}
+
+@keyframes glitchBottom {
+
+  2%,
+  64% {
+    transform: translate(-2px, 0);
+  }
+
+  4%,
+  60% {
+    transform: translate(-2px, 0);
+  }
+
+  62% {
+    transform: translate(-22px, 5px) skew(21deg);
+  }
+}
+
+.glitch-wrapper {
+  position: relative;
+}
+
+.glitch-text {
+  position: relative;
+  /* animation: glitch 5s infinite; */
+}
+
+.glitch-text::before,
+.glitch-text::after {
+  content: attr(title);
+  position: absolute;
+  left: 0;
+}
+
+.glitch-text::before {
+  animation: glitchTop 1s linear infinite;
+  clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+  -webkit-clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+}
+
+.glitch-text::after {
+  animation: glitchBottom 1.5s linear infinite;
+  clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
+  -webkit-clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
+}
+
+/* --- NEW ANIMATIONS FOR HOME V2 --- */
+
+/* Shimmer Text Effect */
+.animate-shimmer {
+  background: linear-gradient(90deg,
+      hsl(var(--primary)) 0%,
+      hsl(var(--secondary)) 25%,
+      hsl(var(--foreground)) 50%,
+      hsl(var(--primary)) 100%);
+  background-size: 200% auto;
+  color: transparent;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 8s linear infinite;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: 200% center;
+  }
+}
+
+/* Bullet / Tracer Animation */
+.bullet {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  box-shadow: 0 0 15px currentColor;
+  pointer-events: none;
+  opacity: 0;
+  will-change: transform, opacity;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  mix-blend-mode: screen;
+}
+
+.bullet-cyan {
+  color: #06b6d4;
+}
+
+/* Cyan-500 */
+.bullet-teal {
+  color: #14b8a6;
+}
+
+/* Teal-500 */
+.bullet-blue {
+  color: #3b82f6;
+}
+
+/* Blue-500 */
+.bullet-warm {
+  color: #f59e0b;
+}
+
+/* Amber-500 */
+
+.animate-shoot-h {
+  animation-name: shootHorizontal;
+}
+
+.animate-shoot-d {
+  animation-name: shootDiagonal;
+}
+
+@keyframes shootHorizontal {
+  0% {
+    transform: translateX(-10vw);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: var(--target-opacity, 1);
+  }
+
+  90% {
+    opacity: var(--target-opacity, 1);
+  }
+
+  100% {
+    transform: translateX(120vw);
+    opacity: 0;
+  }
+}
+
+@keyframes shootDiagonal {
+  0% {
+    transform: translateX(-10vw) translateY(10vh) rotate(-15deg);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: var(--target-opacity, 1);
+  }
+
+  90% {
+    opacity: var(--target-opacity, 1);
+  }
+
+  100% {
+    transform: translateX(120vw) translateY(-20vh) rotate(-15deg);
+    opacity: 0;
+  }
+}
+
+/* Neon Glow Utilities */
+.neon-border {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.neon-border:hover {
+  box-shadow: 0 0 15px hsl(var(--primary) / 0.4), inset 0 0 10px hsl(var(--primary) / 0.2);
+  border-color: hsl(var(--primary) / 0.6);
+  transform: translateY(-4px);
+}
+
+.neon-border-secondary:hover {
+  box-shadow: 0 0 15px hsl(var(--secondary) / 0.4), inset 0 0 10px hsl(var(--secondary) / 0.2);
+  border-color: hsl(var(--secondary) / 0.6);
+}
+
+/* Cursor Glow */
+.cursor-glow {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, hsl(var(--primary) / 0.15) 0%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.3s ease;
+  mix-blend-mode: screen;
+}
