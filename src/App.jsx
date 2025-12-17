@@ -15,6 +15,8 @@ import ResetPassword from "./pages/ResetPassword";
 import TestConnection from "./pages/TestConnection";
 import UpdatePassword from "./pages/UpdatePassword";
 import NotFound from "./pages/NotFound";
+import { Analytics } from "@vercel/analytics/react";
+
 
 const queryClient = new QueryClient();
 
@@ -87,6 +89,7 @@ const App = () => (
                     />
                     <BrowserRouter>
                         <AppRoutes />
+                        <Analytics />
                     </BrowserRouter>
                 </TooltipProvider>
             </AuthProvider>
