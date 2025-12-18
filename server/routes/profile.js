@@ -56,8 +56,8 @@ router.put('/', protect, async (req, res) => {
             } else {
                 user.avatar_url = user.profile.avatarId.startsWith('http') || user.profile.avatarId.startsWith('data:')
                     ? user.profile.avatarId
-                    : `https://api.dicebear.com/7.x/${user.profile.avatarId.includes('Minimal') ? 'identicon' :
-                        user.profile.avatarId.includes('Bot') ? 'bottts' :
+                    : `https://api.dicebear.com/7.x/${(user.profile.avatarId.includes('Gamer') || user.profile.avatarId.includes('Cyber') || user.profile.avatarId.includes('Bot')) ? 'bottts' :
+                        (user.profile.avatarId.includes('Esports') || user.profile.avatarId.includes('Abstract') || user.profile.avatarId.includes('Minimal')) ? 'identicon' :
                             user.profile.avatarId.includes('Retro') ? 'pixel-art' :
                                 'avataaars'
                     }/svg?seed=${user.profile.avatarId}`;
