@@ -2,21 +2,26 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
-import { GameButton } from '@/components/ui/GameButton';
-import { Gamepad2, User, LogOut, Bell, Users } from 'lucide-react';
+import { useSettings } from '@/context/SettingsContext';
+import { Gamepad2, User, LogOut, Bell, Users, Settings } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { ThemeSwitcher } from '@/components/theme/ThemeSwitcher';
+import { cn } from '@/lib/utils';
+import { ProfileCard } from '@/components/profile/ProfileCard';
 
 export const Header = () => {
     const { user, signOut } = useAuth();
+    const { openSettings } = useSettings();
+    const [showProfileCard, setShowProfileCard] = useState(false);
     const [profile, setProfile] = useState(null);
     const [pendingRequests, setPendingRequests] = useState(0);
     const [pendingInvites, setPendingInvites] = useState(0);
@@ -51,98 +56,116 @@ export const Header = () => {
         }
     };
 
-    const handleSignOut = async () => {
-        signOut();
-        toast.success('Logged out successfully');
-    };
 
-    const totalNotifications = pendingRequests + pendingInvites;
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 glass-card border-t-0 rounded-none border-x-0 py-4 px-6">
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <Link to="/" className="flex items-center gap-3 group">
-                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center group-hover:bg-primary/30 transition-colors">
-                        <Gamepad2 className="w-6 h-6 text-primary" />
+        <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40 h-16 transition-all duration-200">
+            <div className="h-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+                {/* Left side: Branding */}
+                <Link to="/" className="flex items-center gap-3 group focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg p-1">
+                    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors duration-200">
+                        <Gamepad2 className="w-5 h-5 text-primary" />
                     </div>
-                    <h1 className="text-xl font-heading font-bold gradient-text hidden sm:block">
-                        Word Imposter
+                    <h1 className="text-lg font-heading font-bold tracking-tight text-foreground group-hover:text-primary transition-colors duration-200">
+                        WORD IMPOSTER
                     </h1>
                 </Link>
 
-                <div className="flex items-center gap-4">
-                    <div className="hover:animate-pulse-glow transition-all duration-300">
-                        <ThemeSwitcher />
+                {/* Right side: Utilities & Profile */}
+                <div className="flex items-center gap-2 sm:gap-4">
+                    {/* Utility Group */}
+                    <div className="flex items-center gap-1 sm:gap-2 pr-2 sm:pr-4 border-r border-border/40">
+                        <div className="opacity-70 hover:opacity-100 transition-opacity duration-150 active:scale-95 transform">
+                            <ThemeSwitcher />
+                        </div>
+
+                        <Link to="/friends" className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
+                            <button className="relative w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-150 hover:scale-105 active:scale-95">
+                                <Users className="w-5 h-5" />
+                                {pendingRequests > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full ring-2 ring-background animate-pulse" />
+                                )}
+                            </button>
+                        </Link>
+
+                        <Link to="/notifications" className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
+                            <button className="relative w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-150 hover:scale-105 active:scale-95">
+                                <Bell className="w-5 h-5" />
+                                {pendingInvites > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-amber-500 rounded-full ring-2 ring-background animate-pulse" />
+                                )}
+                            </button>
+                        </Link>
                     </div>
 
-                    <Link to="/friends">
-                        <GameButton variant="ghost" size="sm" className="relative hover:text-primary hover:drop-shadow-[0_0_10px_rgba(34,197,94,0.5)] transition-all duration-300">
-                            <Users className="w-5 h-5" />
-                            {pendingRequests > 0 && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center animate-bounce">
-                                    {pendingRequests}
-                                </span>
-                            )}
-                        </GameButton>
-                    </Link>
-
-                    <Link to="/notifications">
-                        <GameButton variant="ghost" size="sm" className="relative hover:text-secondary hover:drop-shadow-[0_0_10px_rgba(234,179,8,0.5)] transition-all duration-300">
-                            <Bell className="w-5 h-5" />
-                            {pendingInvites > 0 && (
-                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-secondary text-secondary-foreground text-xs rounded-full flex items-center justify-center animate-bounce">
-                                    {pendingInvites}
-                                </span>
-                            )}
-                        </GameButton>
-                    </Link>
-
+                    {/* Profile Avatar - Dropdown Menu */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <div className="relative group cursor-pointer" onMouseMove={(e) => {
-                                const rect = e.currentTarget.getBoundingClientRect();
-                                const x = e.clientX - rect.left - rect.width / 2;
-                                const y = e.clientY - rect.top - rect.height / 2;
-                                const angle = Math.atan2(y, x) * (180 / Math.PI) + 90;
-                                e.currentTarget.style.setProperty('--fire-angle', `${angle}deg`);
-                            }}
-                                style={{ '--fire-angle': '0deg' }}
-                            >
-                                {/* Fire Effect Ring - Cursor Driven + Spin on Hover */}
-                                <div
-                                    className="absolute -inset-1 rounded-full opacity-60 blur-sm group-hover:opacity-100 group-hover:blur-md transition-all duration-200 group-hover:animate-spin-slow"
-                                    style={{
-                                        background: `conic-gradient(from var(--fire-angle), transparent 20%, #f59e0b 40%, #ef4444 60%, transparent 80%)`
-                                    }}
-                                />
-
-                                {/* Inner glow for extra punch */}
-                                <div className="absolute -inset-0.5 bg-gradient-to-r from-red-500 to-orange-500 rounded-full opacity-0 group-hover:opacity-50 blur-md animate-pulse" />
-
-                                <Avatar className="relative w-10 h-10 border-2 border-background shadow-xl group-hover:scale-105 transition-transform duration-300 z-10 block">
+                            <button className="group relative flex items-center gap-3 outline-none rounded-full focus-visible:ring-2 focus-visible:ring-primary transition-transform active:scale-95 duration-150">
+                                <div className="hidden sm:flex flex-col items-end mr-1 animate-slide-in-right">
+                                    <span className="text-sm font-bold leading-none text-foreground group-hover:text-primary transition-colors duration-200">
+                                        {profile?.full_name || 'Player'}
+                                    </span>
+                                </div>
+                                <Avatar className="w-10 h-10 border-2 border-border group-hover:border-primary transition-colors duration-200 shadow-sm animate-idle">
                                     <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
-                                    <AvatarFallback className="bg-card text-primary font-heading font-bold">
+                                    <AvatarFallback className="bg-muted text-muted-foreground font-heading font-bold">
                                         {profile?.full_name?.charAt(0) || 'P'}
                                     </AvatarFallback>
                                 </Avatar>
-                            </div>
+                            </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48 glass-card border-border">
-                            <DropdownMenuItem asChild>
-                                <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
-                                    <User className="w-4 h-4" />
+
+                        <DropdownMenuContent align="end" className="w-56 mt-2 border-border/40 bg-popover/95 backdrop-blur-xl shadow-xl animate-fade-in-scale origin-top-right">
+                            <DropdownMenuLabel className="font-normal">
+                                <div className="flex flex-col space-y-1">
+                                    <p className="text-sm font-medium leading-none">{profile?.full_name}</p>
+                                    <p className="text-xs leading-none text-muted-foreground">
+                                        @{profile?.username}
+                                    </p>
+                                </div>
+                            </DropdownMenuLabel>
+                            <DropdownMenuSeparator className="bg-border/40" />
+                            <DropdownMenuItem
+                                asChild
+                                className="cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors duration-150"
+                            >
+                                <Link to="/profile">
+                                    <User className="mr-2 h-4 w-4" />
                                     <span>Profile</span>
                                 </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={handleSignOut} className="text-destructive cursor-pointer">
-                                <LogOut className="w-4 h-4 mr-2" />
-                                <span>Logout</span>
+                            <DropdownMenuItem
+                                asChild
+                                className="cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors duration-150"
+                            >
+                                <Link to="/settings">
+                                    <Settings className="mr-2 h-4 w-4" />
+                                    <span>Settings</span>
+                                </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator className="bg-border/40" />
+                            <DropdownMenuItem
+                                className="text-red-500 focus:text-red-500 focus:bg-red-500/10 cursor-pointer transition-colors duration-150"
+                                onClick={() => {
+                                    signOut();
+                                    toast.success('Logged out successfully');
+                                }}
+                            >
+                                <LogOut className="mr-2 h-4 w-4" />
+                                <span className="font-medium">Log out</span>
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
                 </div>
             </div>
+            {showProfileCard && (
+                <ProfileCard
+                    user={user}
+                    profile={profile}
+                    onClose={() => setShowProfileCard(false)}
+                />
+            )}
         </header>
     );
 };

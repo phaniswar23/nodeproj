@@ -1,552 +1,340 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import api from '@/lib/api';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useSocket } from '@/hooks/useSocket';
-import { Header } from '@/components/home/Header';
-import { GlassCard } from '@/components/ui/GlassCard';
-import { GameButton } from '@/components/ui/GameButton';
-import { GameInput } from '@/components/ui/GameInput';
+import api from '@/lib/api';
+import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
-import {
-    Dialog, DialogContent, DialogTitle
-} from '@/components/ui/dialog';
-import { AvatarSelection } from '@/components/profile/AvatarSelection';
 import { toast } from 'sonner';
 import {
-    Trophy, Target, Flame, Star,
-    Instagram, MessageCircle, Edit2, Save, UserPlus, Check, Lock, X, Quote,
-    Gamepad2, Loader2
+    Edit2, ArrowLeft, Trophy, Target, Flame, Star,
+    Instagram, Gamepad2, Copy, Check, Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { BackButton } from '@/components/ui/BackButton';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { motion, AnimatePresence } from 'framer-motion';
 
-const StatCard = ({ label, value, icon: Icon, color, delay }) => (
-    <div
-        className="group relative overflow-hidden rounded-xl bg-card/40 border border-border/50 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-card/60 hover:shadow-lg hover:shadow-primary/5 animate-slide-up"
-        style={{ animationDelay: `${delay}ms` }}
+// --- SUB-COMPONENTS ---
+
+const InfoCard = ({ title, children, className, delay = 0 }) => (
+    <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay, ease: "easeOut" }}
+        className={cn("bg-[#111214]/60 backdrop-blur-xl border border-white/5 rounded-2xl p-6 relative overflow-hidden group", className)}
     >
-        <div className="flex items-start justify-between">
-            <div>
-                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{label}</p>
-                <p className="mt-2 text-2xl font-heading font-bold text-foreground group-hover:text-primary transition-colors">
-                    {value}
-                </p>
-            </div>
-            <div className={cn("p-2 rounded-lg bg-background/50 group-hover:scale-110 transition-transform duration-300", color)}>
-                <Icon className="w-5 h-5" />
-            </div>
+        {/* Subtle Gradient Glow */}
+        <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-white/5 blur-[80px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none opacity-0 group-hover:opacity-50 transition-opacity duration-700" />
+
+        {title && (
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4 flex items-center gap-2">
+                {title}
+            </h3>
+        )}
+        <div className="relative z-10">
+            {children}
         </div>
-        {/* Hover glow effect */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-    </div>
+    </motion.div>
 );
 
-const Profile = () => {
-    const { userId } = useParams();
-    const { user } = useAuth();
-    const navigate = useNavigate();
-    const [profile, setProfile] = useState(null);
-    const [stats, setStats] = useState(null);
-    const [isEditing, setIsEditing] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const [isFriend, setIsFriend] = useState(false);
-    const [friendRequestPending, setFriendRequestPending] = useState(false);
-    const [editForm, setEditForm] = useState({});
-    const [onlineUsers, setOnlineUsers] = useState(new Set());
-    const socket = useSocket();
+const StatCard = ({ icon: Icon, label, value, color, delay = 0 }) => (
+    <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        whileHover={{ y: -5, scale: 1.02 }}
+        transition={{ duration: 0.3, delay }}
+        className="bg-[#111214]/40 backdrop-blur-sm p-5 rounded-2xl border border-white/5 flex flex-col justify-between h-32 hover:border-white/20 transition-all cursor-default group relative overflow-hidden"
+    >
+        <div className="flex justify-between items-start z-10">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest group-hover:text-white/70 transition-colors">{label}</span>
+            <div className={cn("p-1.5 rounded-lg bg-white/5 opacity-50 group-hover:opacity-100 transition-all", color.replace('text-', 'text-opacity-80 '))}>
+                <Icon className={cn("w-4 h-4", color)} />
+            </div>
+        </div>
 
-    const targetUserId = userId || user?._id;
-    const isOwnProfile = targetUserId === user?._id;
+        <div className="relative z-10">
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: delay + 0.2 }}
+                className="text-3xl font-heading font-black text-white tracking-tight"
+            >
+                {value}
+            </motion.div>
+        </div>
+
+        {/* Dynamic Glow */}
+        <div className={cn("absolute -bottom-10 -right-10 w-32 h-32 rounded-full blur-[50px] opacity-0 group-hover:opacity-20 transition-opacity duration-500", color.replace('text-', 'bg-'))} />
+    </motion.div>
+);
+
+const ConnectionItem = ({ icon: Icon, label, value, link, colorClass }) => {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!value) return;
+        navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        toast.success(`Copied ${label} to clipboard`);
+    };
+
+    if (!value) return null;
+
+    return (
+        <a
+            href={link || "#"}
+            target={link ? "_blank" : "_self"}
+            rel="noopener noreferrer"
+            className={cn(
+                "flex items-center gap-4 p-3 rounded-xl bg-white/5 border border-transparent hover:border-white/10 hover:bg-white/10 transition-all group relative overflow-hidden cursor-pointer no-underline"
+            )}
+            onClick={!link ? handleCopy : undefined}
+        >
+            <div className={cn("w-10 h-10 rounded-full flex items-center justify-center bg-black/40 shadow-inner", colorClass)}>
+                <Icon className="w-5 h-5 text-white" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-muted-foreground uppercase">{label}</p>
+                <p className="text-sm font-bold text-white truncate">{value}</p>
+            </div>
+
+            <div className="bg-black/20 p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity scale-90 group-hover:scale-100">
+                {link ? <ArrowLeft className="w-4 h-4 text-white rotate-135" /> : (
+                    copied ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4 text-white" />
+                )}
+            </div>
+        </a>
+    );
+};
+
+const Profile = () => {
+    const { user: currentUser } = useAuth();
+    const navigate = useNavigate();
+    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState(null);
+
+    // Determines if we are viewing our own profile
+    const userId = currentUser?._id;
+    const isOwnProfile = true;
 
     useEffect(() => {
         const fetchProfile = async () => {
-            if (!targetUserId) return;
-
             try {
-                const { data } = await api.get(`/users/${targetUserId}/profile`);
+                const { data } = await api.get(`/users/${userId}/profile`);
                 setProfile(data);
-                setStats(data.stats); // Backend now returns stats nested
-                setEditForm(data);
             } catch (error) {
-                toast.error('Profile not found');
-                navigate('/');
+                console.error(error);
+                toast.error("Failed to load profile");
             } finally {
                 setLoading(false);
             }
         };
 
-        const checkFriendship = async () => {
-            try {
-                const { data: friends } = await api.get('/friends');
-                const isF = friends.some((f) => f._id === targetUserId);
-                setIsFriend(isF);
+        if (userId) fetchProfile();
+    }, [userId]);
 
-                // Check requests (optional refinement)
-            } catch (e) { console.error(e); }
-        };
+    if (loading) return <LoadingScreen />;
 
-        if (targetUserId) {
-            fetchProfile();
-            if (!isOwnProfile) {
-                checkFriendship();
-            }
-        }
-    }, [targetUserId, user, navigate, isOwnProfile]);
-
-    // Socket presence tracking 
-
-    useEffect(() => {
-        if (!socket) return;
-
-        // Request initial status? No event for that usually, just wait for broadcast or connection.
-        // Actually, backend emits on connection. If we join late, we might miss it?
-        // No, backend emits to ALL clients on any connect/disconnect.
-        // But what if we navigate to Profile page and we missed the last emit?
-        // We might want to ask for it? 
-        // For now, rely on standard broadcast. Ideally backend should emit on "request_online_users".
-        // But let's just listen.
-
-        socket.on('online_users', (users) => {
-            setOnlineUsers(new Set(users));
-        });
-
-        return () => {
-            socket.off('online_users');
-        };
-    }, [socket]);
-
-    const handleSave = async () => {
-        if (!user) return;
-        setSaving(true);
-
-        try {
-            // Handle Password Change if fields are present
-            if (editForm.currentPassword || editForm.newPassword) {
-                if (!editForm.currentPassword || !editForm.newPassword) {
-                    toast.error("Please fill in both current and new password");
-                    setSaving(false);
-                    return;
-                }
-                if (editForm.newPassword !== editForm.confirmNewPassword) {
-                    toast.error("New passwords do not match");
-                    setSaving(false);
-                    return;
-                }
-
-                await api.post('/auth/change-password', {
-                    currentPassword: editForm.currentPassword,
-                    newPassword: editForm.newPassword
-                });
-                toast.success('Password updated securely');
-                // Clear password fields
-                setEditForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmNewPassword: '' }));
-            }
-
-            // Handle Profile Update
-            const { data } = await api.put(`/users/${user._id}/profile`, {
-                full_name: editForm.full_name,
-                bio: editForm.bio,
-                instagram_username: editForm.instagram_username,
-                discord_link: editForm.discord_link,
-                is_private: editForm.is_private,
-                avatar_url: editForm.avatar_url,
-            });
-
-            toast.success('Profile saved! ✨');
-            setProfile(prev => prev ? { ...prev, ...data } : null);
-            setIsEditing(false);
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to save changes');
-        } finally {
-            setSaving(false);
-        }
+    // Helper to get Banner Style
+    const getBannerStyle = () => {
+        const b = profile?.profile?.banner || { type: 'color', value: profile?.banner_url || '#1e1f22' };
+        if (b.type === 'image') return { backgroundImage: `url(${b.value})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+        if (b.type === 'gradient' || b.type === 'preset') return { background: b.value };
+        return { backgroundColor: b.value };
     };
 
-    const handleFileUpload = async (event) => {
-        // Mock upload for now or disable
-        toast.info("Custom uploads are disabled. Please use the Avatar Library.");
+    const getAvatarSrc = () => {
+        const avatarId = profile?.profile?.avatarId || profile?.avatar_url || 'avatar_default';
+        if (avatarId.startsWith('http') || avatarId.startsWith('data:')) return avatarId;
+
+        let style = 'avataaars';
+        if (avatarId.includes('Gamer') || avatarId.includes('Cyber') || avatarId.includes('Bot')) style = 'bottts';
+        else if (avatarId.includes('Esports') || avatarId.includes('Abstract') || avatarId.includes('Minimal')) style = 'identicon';
+        else if (avatarId.includes('Retro')) style = 'pixel-art';
+
+        return `https://api.dicebear.com/7.x/${style}/svg?seed=${avatarId}`;
     };
-
-    const sendFriendRequest = async () => {
-        if (!user || !targetUserId) return;
-
-        try {
-            await api.post('/friends/request', { toUserId: targetUserId });
-            toast.success('Friend request sent! 🤝');
-            setFriendRequestPending(true);
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to send request');
-        }
-    };
-
-    const canViewFullProfile = isOwnProfile || !profile?.is_private || isFriend;
-
-    const statItems = [
-        { label: 'Games Played', value: stats?.rooms_participated || 0, icon: Target, color: 'text-primary' },
-        { label: 'Wins', value: stats?.wins || 0, icon: Trophy, color: 'text-success' },
-        { label: 'Losses', value: stats?.losses || 0, icon: Flame, color: 'text-destructive' },
-        { label: 'Total Score', value: stats?.total_score || 0, icon: Star, color: 'text-secondary' },
-    ];
-
-    if (loading) {
-        return <LoadingScreen />;
-    }
 
     return (
-        <div className="min-h-screen bg-background text-foreground font-body overflow-x-hidden">
-            <Header />
+        <div className="min-h-screen w-screen bg-[#0b0c0e] text-foreground font-body overflow-y-auto custom-scrollbar selection:bg-primary/30">
 
-            {/* Animated Background */}
-            <div className="fixed inset-0 pointer-events-none -z-10">
-                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/5 via-background to-background" />
-                <div className="absolute -top-[20%] -left-[10%] w-[50vw] h-[50vw] bg-primary/10 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '8s' }} />
-                <div className="absolute top-[20%] -right-[10%] w-[40vw] h-[40vw] bg-secondary/5 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '10s', animationDelay: '1s' }} />
+            {/* Background Ambience */}
+            <div className="fixed inset-0 bg-[#0b0c0e] pointer-events-none z-0">
+                <div className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] bg-blue-900/10 blur-[150px] rounded-full" />
+                <div className="absolute bottom-[-20%] right-[-10%] w-[60vw] h-[60vw] bg-purple-900/10 blur-[150px] rounded-full" />
+                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] mix-blend-overlay" />
             </div>
 
-            <main className="pt-24 pb-12 px-4 container mx-auto max-w-5xl">
-                <div className="mb-6">
-                    <BackButton />
+            {/* Sticky Back Button */}
+            <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.5 }}
+                className="fixed top-8 left-8 z-50 group cursor-pointer"
+                onClick={() => navigate('/')}
+            >
+                <div className="flex items-center gap-3 px-4 py-2.5 bg-black/40 backdrop-blur-md rounded-full border border-white/5 hover:bg-white/10 hover:border-white/20 transition-all shadow-xl">
+                    <ArrowLeft className="w-5 h-5 text-gray-400 group-hover:text-white transition-colors" />
+                    <span className="text-xs font-bold text-gray-400 group-hover:text-white uppercase tracking-widest hidden sm:block pr-1">Back</span>
                 </div>
-                <div className="animate-slide-up">
-                    {/* Profile Hero Card */}
-                    <GlassCard className="relative overflow-hidden border-primary/20 p-0">
-                        {/* Subtle Banner Background inside card */}
-                        <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-primary/10 to-transparent opacity-50 pointer-events-none" />
+            </motion.div>
 
-                        <div className="p-6 md:p-10 flex flex-col md:flex-row items-center md:items-start gap-8 relative z-10">
-                            {/* Avatar Section */}
-                            <div className="relative group shrink-0">
-                                {/* Animated Ring */}
-                                <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-primary via-secondary to-primary opacity-70 blur-md group-hover:opacity-100 group-hover:blur-lg transition-all duration-500 animate-spin-slow" />
+            <main className="relative flex flex-col items-center min-h-full pt-0 pb-20 z-10 w-full">
 
-                                <Avatar className="w-32 h-32 md:w-40 md:h-40 border-4 border-background shadow-2xl relative z-10 group-hover:scale-105 transition-transform duration-300">
-                                    <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
-                                    <AvatarFallback className="bg-card text-primary text-5xl font-heading font-bold">
-                                        {canViewFullProfile ? profile?.full_name?.charAt(0) : <Lock className="w-12 h-12" />}
+                {/* HERO BANNER SECTION */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 1 }}
+                    className="w-full h-80 relative overflow-hidden"
+                >
+                    <div className="absolute inset-0 transition-transform hover:scale-105" style={{ ...getBannerStyle(), transitionDuration: '20s' }} />
+                    <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#0b0c0e]/40 to-[#0b0c0e]" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b0c0e] via-transparent to-transparent opacity-90" />
+                </motion.div>
+
+                <div className="w-full max-w-5xl px-6 md:px-10 -mt-32 space-y-12 mb-20">
+
+                    {/* PROFILE HEADER */}
+                    <div className="flex flex-col md:flex-row items-center md:items-end gap-8">
+
+                        {/* Avatar */}
+                        <motion.div
+                            initial={{ scale: 0.8, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 100, delay: 0.2 }}
+                            className="relative"
+                        >
+                            <div className="w-40 h-40 md:w-48 md:h-48 rounded-full p-1.5 bg-[#0b0c0e] ring-2 ring-white/10 relative z-20 shadow-2xl">
+                                <Avatar className="w-full h-full rounded-full border-4 border-[#121316] bg-[#1e1f22]">
+                                    <AvatarImage src={getAvatarSrc()} className="object-cover" />
+                                    <AvatarFallback className="bg-[#1e1f22] text-white text-5xl font-bold">
+                                        {profile?.full_name?.[0]}
                                     </AvatarFallback>
                                 </Avatar>
-
-                                {/* Online Indicator */}
-                                <div
-                                    className={cn(
-                                        "absolute bottom-2 right-2 w-5 h-5 border-4 border-card rounded-full z-20 shadow-lg",
-                                        onlineUsers.has(profile?._id) ? "bg-green-500" : "bg-red-500"
-                                    )}
-                                    title={onlineUsers.has(profile?._id) ? "Online" : "Offline"}
-                                />
                             </div>
 
-                            {/* Info Section */}
-                            <div className="flex-1 text-center md:text-left space-y-4 w-full">
-                                <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-4">
-                                    <div>
-                                        <h1 className="text-3xl md:text-4xl font-heading font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/70">
-                                            {profile?.full_name}
-                                        </h1>
-                                        <p className="text-lg text-muted-foreground font-medium flex items-center justify-center md:justify-start gap-2">
-                                            @{profile?.username}
-                                            {profile?.is_private && <Lock className="w-4 h-4 opacity-50" />}
-                                        </p>
+
+                        </motion.div>
+
+                        {/* Name & Actions */}
+                        <div className="flex-1 text-center md:text-left pb-4 space-y-3">
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8"
+                            >
+                                <h1 className="text-4xl md:text-6xl font-heading font-black text-white leading-none tracking-tight drop-shadow-2xl">
+                                    {profile?.profile?.display_name || profile?.full_name}
+                                </h1>
+
+                                {isOwnProfile && (
+                                    <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => navigate('/profile/edit')}
+                                        className="mx-auto md:mx-0 px-5 py-2 rounded-full border border-white/20 bg-white/5 hover:bg-white/10 text-white transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2 group backdrop-blur-sm self-start mt-2"
+                                    >
+                                        <Edit2 className="w-3 h-3 text-gray-400 group-hover:text-white transition-colors" />
+                                        <span>Edit Profile</span>
+                                    </motion.button>
+                                )}
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.4 }}
+                                className="flex items-center justify-center md:justify-start gap-4"
+                            >
+                                <p className="text-gray-400 text-lg font-medium tracking-wide">@{profile?.username}</p>
+                                {profile?.profile?.pronouns && (
+                                    <>
+                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-600" />
+                                        <span className="text-gray-500 text-sm font-bold uppercase tracking-wider">{profile.profile.pronouns}</span>
+                                    </>
+                                )}
+                            </motion.div>
+                        </div>
+                    </div>
+
+                    {/* CONTENT GRID */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+
+                        {/* LEFT COLUMN: About & Stats (8 cols) */}
+                        <div className="md:col-span-8 space-y-6">
+
+                            {/* Bio Card */}
+                            <InfoCard title="About" className="min-h-[160px]" delay={0.4}>
+                                <p className="text-gray-300 leading-relaxed text-lg font-light text-pretty">
+                                    {profile?.profile?.bio || profile?.bio || <span className="opacity-30 italic">No bio written yet. Just vibing in the void.</span>}
+                                </p>
+                            </InfoCard>
+
+                            {/* Player Stats */}
+                            <div className="space-y-4">
+                                <motion.h3
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: 0.5 }}
+                                    className="text-xs font-bold text-muted-foreground uppercase tracking-widest pl-2"
+                                >
+                                    Career Stats
+                                </motion.h3>
+
+                                {(!profile?.profile?.is_private || isOwnProfile) ? (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                        <StatCard icon={Target} label="Games" value={profile?.stats?.games_played || "0"} color="text-cyan-400" delay={0.5} />
+                                        <StatCard icon={Trophy} label="Wins" value={profile?.stats?.wins || "0"} color="text-emerald-400" delay={0.6} />
+                                        <StatCard icon={Flame} label="Losses" value={profile?.stats?.losses || "0"} color="text-rose-400" delay={0.7} />
+                                        <StatCard icon={Star} label="Score" value={profile?.stats?.total_score || "0"} color="text-amber-400" delay={0.8} />
                                     </div>
-
-                                    <div className="flex items-center gap-3">
-                                        {isOwnProfile ? (
-                                            <GameButton
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => setIsEditing(true)}
-                                                className="border-primary/50 hover:bg-primary/10 hover:border-primary group"
-                                            >
-                                                <Edit2 className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform" />
-                                                Edit Profile
-                                            </GameButton>
-                                        ) : (
-                                            !isFriend && !friendRequestPending && (
-                                                <GameButton onClick={sendFriendRequest} size="sm" className="shadow-lg shadow-primary/20">
-                                                    <UserPlus className="w-4 h-4 mr-2" />
-                                                    Add Friend
-                                                </GameButton>
-                                            )
-                                        )}
-                                        {friendRequestPending && (
-                                            <GameButton variant="secondary" size="sm" disabled>
-                                                <Check className="w-4 h-4 mr-2" />
-                                                Request Sent
-                                            </GameButton>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Bio & Socials */}
-                                {canViewFullProfile && (
-                                    <div className="space-y-4 max-w-2xl">
-                                        {profile?.bio && (
-                                            <div className="relative group">
-                                                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-xl blur opacity-20 group-hover:opacity-40 transition duration-500" />
-                                                <div className="relative bg-card/40 backdrop-blur-sm border border-white/10 p-6 rounded-xl overflow-hidden">
-                                                    <Quote className="absolute top-4 right-4 w-8 h-8 text-primary/10 -rotate-12 transform group-hover:scale-110 transition-transform duration-500" />
-                                                    <Quote className="absolute bottom-4 left-4 w-8 h-8 text-primary/10 rotate-180 transform group-hover:scale-110 transition-transform duration-500" />
-
-                                                    <div className="relative z-10">
-                                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-2 block">
-                                                            Player Bio
-                                                        </span>
-                                                        <p className="text-lg italic text-foreground/90 leading-relaxed font-light">
-                                                            "{profile.bio}"
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-2">
-                                            {profile?.instagram_username && (
-                                                <a
-                                                    href={`https://instagram.com/${profile.instagram_username}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/40 border border-white/5 hover:bg-white/5 hover:border-primary/30 transition-all duration-300 group"
-                                                >
-                                                    <Instagram className="w-4 h-4 text-[#E1306C] group-hover:scale-110 transition-transform" />
-                                                    <span className="text-sm font-medium">{profile.instagram_username}</span>
-                                                </a>
-                                            )}
-                                            {profile?.discord_link && (
-                                                <a
-                                                    href={profile.discord_link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-background/40 border border-white/5 hover:bg-white/5 hover:border-[#5865F2]/30 transition-all duration-300 group"
-                                                >
-                                                    <MessageCircle className="w-4 h-4 text-[#5865F2] group-hover:scale-110 transition-transform" />
-                                                    <span className="text-sm font-medium">Discord</span>
-                                                </a>
-                                            )}
+                                ) : (
+                                    <div className="p-10 border border-dashed border-white/10 rounded-2xl bg-white/5 flex flex-col items-center justify-center gap-3">
+                                        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center">
+                                            <Lock className="w-5 h-5 text-gray-500" />
                                         </div>
+                                        <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Stats are private</p>
                                     </div>
                                 )}
                             </div>
                         </div>
-                    </GlassCard>
 
-                    {/* Stats Grid */}
-                    <div className="mt-8">
-                        <h3 className="text-xl font-heading font-bold mb-4 opacity-90 flex items-center gap-2">
-                            <Trophy className="w-5 h-5 text-primary" />
-                            Player Stats
-                        </h3>
+                        {/* RIGHT COLUMN: Connections (4 cols) */}
+                        <div className="md:col-span-4 space-y-6">
+                            <InfoCard title="Connections" className="h-full" delay={0.6}>
+                                <div className="space-y-3">
+                                    {(!profile?.profile?.instagram_username && !profile?.profile?.discord_link) && (
+                                        <div className="py-8 text-center">
+                                            <p className="text-sm text-gray-500 italic">No connections added.</p>
+                                        </div>
+                                    )}
 
-                        {canViewFullProfile ? (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {statItems.map((item, idx) => (
-                                    <StatCard key={item.label} {...item} delay={idx * 100} />
-                                ))}
-                            </div>
-                        ) : (
-                            <GlassCard className="py-12 text-center border-dashed border-white/10 bg-card/20">
-                                <Lock className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3" />
-                                <p className="text-muted-foreground font-medium">Stats are private</p>
-                                <p className="text-sm text-muted-foreground/60">Add {profile?.full_name} friend to view their stats</p>
-                            </GlassCard>
-                        )}
-                    </div>
-                </div>
-            </main>
-
-            <Dialog open={isEditing} onOpenChange={setIsEditing}>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-card border-primary/20 backdrop-blur-xl p-0 gap-0">
-                    <div className="sticky top-0 bg-inherit z-10 p-6 border-b border-white/10 flex justify-between items-center backdrop-blur-md">
-                        <DialogTitle className="text-xl font-heading font-bold text-primary">Edit Profile</DialogTitle>
-                        <button
-                            onClick={() => setIsEditing(false)}
-                            className="p-1 rounded-full hover:bg-white/10 transition-colors"
-                        >
-                            <X className="w-5 h-5" />
-                        </button>
-                    </div>
-
-                    <div className="p-6 pt-2">
-                        <Tabs defaultValue="info" className="w-full">
-                            <TabsList className="grid w-full grid-cols-3 mb-6 bg-background/50">
-                                <TabsTrigger value="info" className="font-heading text-xs tracking-wider">
-                                    <Edit2 className="w-3 h-3 mr-2" />
-                                    Info
-                                </TabsTrigger>
-                                <TabsTrigger value="avatar" className="font-heading text-xs tracking-wider">
-                                    <Gamepad2 className="w-3 h-3 mr-2" />
-                                    Avatar
-                                </TabsTrigger>
-                                <TabsTrigger value="security" className="font-heading text-xs tracking-wider">
-                                    <Lock className="w-3 h-3 mr-2" />
-                                    Security
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="info" className="space-y-6">
-                                <div className="space-y-4">
-                                    <GameInput
-                                        label="Full Name"
-                                        value={editForm.full_name || ''}
-                                        onChange={(e) => setEditForm(prev => ({ ...prev, full_name: e.target.value }))}
-                                        className="bg-background/50"
+                                    <ConnectionItem
+                                        icon={Instagram}
+                                        label="Instagram"
+                                        value={profile?.profile?.instagram_username ? `@${profile.profile.instagram_username}` : null}
+                                        link={profile?.profile?.instagram_username ? `https://instagram.com/${profile.profile.instagram_username}` : null}
+                                        colorClass="bg-gradient-to-tr from-yellow-500 via-pink-500 to-purple-600"
                                     />
 
-                                    <div className="space-y-2">
-                                        <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold">Bio</Label>
-                                        <Textarea
-                                            value={editForm.bio || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, bio: e.target.value }))}
-                                            placeholder="Write something about your gaming style..."
-                                            className="bg-background/50 border-input focus:border-primary/50 min-h-[100px] resize-none"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <GameInput
-                                            label="Instagram"
-                                            value={editForm.instagram_username || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, instagram_username: e.target.value }))}
-                                            placeholder="username"
-                                            className="bg-background/50"
-                                        />
-                                        <GameInput
-                                            label="Discord"
-                                            value={editForm.discord_link || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, discord_link: e.target.value }))}
-                                            placeholder="Invite Link"
-                                            className="bg-background/50"
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 rounded-xl bg-background/30 border border-white/5">
-                                        <div>
-                                            <Label className="text-base cursor-pointer" htmlFor="private-mode">Private Mode</Label>
-                                            <p className="text-xs text-muted-foreground mt-1">Hide stats from non-friends</p>
-                                        </div>
-                                        <Switch
-                                            id="private-mode"
-                                            checked={editForm.is_private || false}
-                                            onCheckedChange={(checked) => setEditForm(prev => ({ ...prev, is_private: checked }))}
-                                        />
-                                    </div>
+                                    <ConnectionItem
+                                        icon={Gamepad2}
+                                        label="Discord"
+                                        value={profile?.profile?.discord_link}
+                                        colorClass="bg-[#5865F2]"
+                                    />
                                 </div>
-                            </TabsContent>
-
-                            <TabsContent value="avatar" className="space-y-6">
-                                <div className="flex flex-col items-center justify-center p-6 bg-background/30 rounded-xl mb-4 border border-white/5">
-                                    <Label className="mb-4 text-muted-foreground uppercase tracking-widest text-xs">Current Avatar Preview</Label>
-                                    <Avatar className="w-32 h-32 border-4 border-primary/20 shadow-xl">
-                                        <AvatarImage src={editForm.avatar_url || profile?.avatar_url || undefined} />
-                                        <AvatarFallback className="bg-card text-primary text-4xl font-heading">
-                                            {editForm.full_name?.charAt(0) || user?.email?.charAt(0)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                </div>
-
-                                {/* Custom Upload Section */}
-                                <div className="space-y-2">
-                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-2">Upload Custom Image</Label>
-                                    <div className="flex items-center gap-3">
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleFileUpload}
-                                            className="bg-background/50 cursor-pointer file:cursor-pointer file:text-primary file:font-bold file:border-0 file:bg-transparent file:text-sm file:mr-4 hover:file:text-primary/80"
-                                            disabled={uploading}
-                                        />
-                                        {uploading && <Loader2 className="w-5 h-5 animate-spin text-primary" />}
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">Max size 2MB. Supported: JPG, PNG, GIF</p>
-                                </div>
-
-                                <div className="relative my-4">
-                                    <div className="absolute inset-0 flex items-center">
-                                        <span className="w-full border-t border-border/50" />
-                                    </div>
-                                    <div className="relative flex justify-center text-xs uppercase">
-                                        <span className="bg-card px-2 text-muted-foreground">Or Choose from Library</span>
-                                    </div>
-                                </div>
-
-                                <AvatarSelection
-                                    currentAvatarUrl={editForm.avatar_url || null}
-                                    onSelect={(url) => setEditForm(prev => ({ ...prev, avatar_url: url }))}
-                                />
-
-                            </TabsContent>
-
-                            <TabsContent value="security" className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 mb-4">
-                                        <h4 className="flex items-center gap-2 font-bold text-primary mb-2">
-                                            <Lock className="w-4 h-4" />
-                                            Password Management
-                                        </h4>
-                                        <p className="text-xs text-muted-foreground">
-                                            Update your password regularly to keep your account secure.
-                                        </p>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <GameInput
-                                            type="password"
-                                            label="Current Password"
-                                            placeholder="••••••••"
-                                            value={editForm.currentPassword || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                            className="bg-background/50"
-                                        />
-                                        <div className="h-px bg-white/5 my-2" />
-                                        <GameInput
-                                            type="password"
-                                            label="New Password"
-                                            placeholder="••••••••"
-                                            value={editForm.newPassword || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, newPassword: e.target.value }))}
-                                            className="bg-background/50"
-                                        />
-                                        <GameInput
-                                            type="password"
-                                            label="Confirm New Password"
-                                            placeholder="••••••••"
-                                            value={editForm.confirmNewPassword || ''}
-                                            onChange={(e) => setEditForm(prev => ({ ...prev, confirmNewPassword: e.target.value }))}
-                                            className="bg-background/50"
-                                        />
-                                    </div>
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-
-                        <div className="pt-4 border-t border-white/5 flex gap-3 mt-4">
-                            <GameButton
-                                variant="ghost"
-                                onClick={() => setIsEditing(false)}
-                                className="flex-1"
-                            >
-                                Cancel
-                            </GameButton>
-                            <GameButton
-                                onClick={handleSave}
-                                className="flex-1"
-                                disabled={saving}
-                            >
-                                {saving ? <div className="animate-spin mr-2 w-4 h-4 border-2 border-white/20 border-t-white rounded-full" /> : <Save className="w-4 h-4 mr-2" />}
-                                Save Changes
-                            </GameButton>
+                            </InfoCard>
                         </div>
+
                     </div>
-                </DialogContent>
-            </Dialog>
+
+                </div>
+            </main>
         </div>
     );
 };

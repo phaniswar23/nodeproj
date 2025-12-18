@@ -7,22 +7,24 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const checkAuth = async () => {
-            const token = localStorage.getItem('token');
-            if (token) {
-                try {
-                    const { data } = await api.get('/auth/me');
-                    setUser(data);
-                } catch (error) {
-                    console.error('Auth check failed:', error);
-                    localStorage.removeItem('token');
-                    setUser(null);
-                }
+    const checkAuth = async () => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            try {
+                const { data } = await api.get('/auth/me');
+                setUser(data);
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                localStorage.removeItem('token');
+                setUser(null);
             }
-            setLoading(false);
-        };
+        } else {
+            setUser(null);
+        }
+        setLoading(false);
+    };
 
+    useEffect(() => {
         checkAuth();
     }, []);
 
@@ -56,7 +58,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, loading, signUp, signIn, signOut, refreshUser: checkAuth }}>
             {children}
         </AuthContext.Provider>
     );

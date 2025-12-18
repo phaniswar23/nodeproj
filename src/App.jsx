@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { SettingsProvider } from "@/context/SettingsContext";
+import { SettingsModal } from "@/components/settings/SettingsModal";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Home from "./pages/Home";
 import Auth from "./pages/Auth";
@@ -15,6 +17,8 @@ import ResetPassword from "./pages/ResetPassword";
 import TestConnection from "./pages/TestConnection";
 import UpdatePassword from "./pages/UpdatePassword";
 import NotFound from "./pages/NotFound";
+import Settings from "./pages/Settings";
+import EditProfile from "./pages/EditProfile";
 import { Analytics } from "@vercel/analytics/react";
 
 
@@ -61,7 +65,9 @@ const AppRoutes = () => (
         <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/profile/edit" element={<ProtectedRoute><EditProfile /></ProtectedRoute>} />
         <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
         <Route path="/room/:roomId" element={<ProtectedRoute><Room /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
@@ -77,20 +83,23 @@ const App = () => (
         <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
             <AuthProvider>
                 <TooltipProvider>
-                    <Toaster />
-                    <Sonner
-                        toastOptions={{
-                            classNames: {
-                                title: 'text-lg font-bold font-heading',
-                                description: 'text-base font-body',
-                                toast: 'border-border bg-card/90 backdrop-blur-xl'
-                            }
-                        }}
-                    />
-                    <BrowserRouter>
-                        <AppRoutes />
-                        <Analytics />
-                    </BrowserRouter>
+                    <SettingsProvider>
+                        <Toaster />
+                        <Sonner
+                            toastOptions={{
+                                classNames: {
+                                    title: 'text-lg font-bold font-heading',
+                                    description: 'text-base font-body',
+                                    toast: 'border-border bg-card/90 backdrop-blur-xl'
+                                }
+                            }}
+                        />
+                        <BrowserRouter>
+                            <AppRoutes />
+                            <SettingsModal />
+                            <Analytics />
+                        </BrowserRouter>
+                    </SettingsProvider>
                 </TooltipProvider>
             </AuthProvider>
         </ThemeProvider>

@@ -178,10 +178,14 @@ import roomRoutes from "./routes/rooms.js";
 import userRoutes from "./routes/users.js";
 import friendRoutes from "./routes/friends.js";
 import messageRoutes from "./routes/messages.js";
+import profileRoutes from "./routes/profile.js";
+import accountRoutes from "./routes/account.js";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/users", userRoutes);
+app.use("/api/profile", profileRoutes); // New
+app.use("/api/account", accountRoutes); // New STRICT requirement
 app.use("/api/friends", friendRoutes);
 app.use("/api/messages", messageRoutes);
 

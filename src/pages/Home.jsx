@@ -13,6 +13,7 @@ import { BackgroundParticles } from '@/components/home/BackgroundParticles';
 import { CursorEffect } from '@/components/ui/CursorEffect';
 import { cn } from '@/lib/utils';
 
+
 const Home = () => {
     const { user } = useAuth();
     const navigate = useNavigate();

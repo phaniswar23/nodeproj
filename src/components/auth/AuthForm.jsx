@@ -8,9 +8,11 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from 'sonner';
 import { Link, useNavigate } from 'react-router-dom';
 import { Lock, User, ArrowRight, Eye, EyeOff, ShieldQuestion, KeyRound, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import ForgotPasswordModal from './ForgotPasswordModal';
 import api from '@/lib/api';
 import { z } from 'zod';
+
 
 const SECURITY_QUESTIONS = [
     "What was the name of your first pet?",
@@ -20,8 +22,24 @@ const SECURITY_QUESTIONS = [
     "What is the name of your favorite teacher?",
 ];
 
-const AuthForm = () => {
-    const [isLogin, setIsLogin] = useState(true);
+
+const letterContainerVariants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.03,
+            delayChildren: 0.1
+        }
+    }
+};
+
+const letterVariants = {
+    hidden: { opacity: 0, y: 10 },
+    show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 200 } }
+};
+
+const AuthForm = ({ isLogin, onToggle }) => {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -143,14 +161,7 @@ const AuthForm = () => {
         setLoading(true);
         try {
             const { error } = isLogin
-                ? await signIn({ username: formData.username, password: formData.password }) // Use username as 'username' param
-                // Note: The useAuth hook typically calls api.post('/auth/login', credentials).
-                // Our backend now expects { username, password }.
-                // If the useAuth hook passes 'email', we need to check if it adapts.
-                // Assuming useAuth just passes the object we give it or maps it.
-                // We'll pass { username: formData.username, password: ... } explicitely if needed,
-                // but usually the hook takes (credentials) => api.post(..., credentials).
-                // Let's pass the correct keys the backend expects.
+                ? await signIn({ username: formData.username, password: formData.password })
                 : await signUp({
                     username: formData.username,
                     password: formData.password,
@@ -198,7 +209,6 @@ const AuthForm = () => {
 
         if (!isLogin) {
             if (!formData.full_name?.trim()) return false;
-            // Check password rules
             if (!Object.values(passwordRules).every(Boolean)) return false;
             if (formData.password !== formData.confirmPassword) return false;
             if (!formData.hintQuestion) return false;
@@ -208,16 +218,37 @@ const AuthForm = () => {
         return true;
     };
 
+    const handleSwitchMode = () => {
+        setErrors({});
+        setFormData({ ...formData, username: '', password: '', confirmPassword: '' });
+        setUsernameAvailable(null);
+        onToggle();
+    };
+
     return (
-        <div className="w-full max-w-md animate-slide-up">
-            <GlassCard className="p-8 border-primary/20 bg-card/80 backdrop-blur-3xl shadow-2xl">
+        <div className="w-full max-w-md">
+            <GlassCard className="p-8 bg-card/60 backdrop-blur-lg shadow-2xl will-change-transform">
                 <div className="text-center mb-6">
-                    <h2 className="text-3xl font-heading font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-secondary animate-pulse-glow">
-                        {isLogin ? 'Welcome Back' : 'Create Your Profile'}
-                    </h2>
-                    <p className="text-muted-foreground text-sm tracking-wide">
+                    <motion.h2
+                        variants={letterContainerVariants}
+                        initial="hidden"
+                        animate="show"
+                        className="text-3xl font-heading font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary via-accent to-secondary animate-pulse-glow flex justify-center"
+                    >
+                        {(isLogin ? 'Welcome Back' : 'Create Your Profile').split("").map((char, i) => (
+                            <motion.span key={i} variants={letterVariants}>
+                                {char === " " ? "\u00A0" : char}
+                            </motion.span>
+                        ))}
+                    </motion.h2>
+                    <motion.p
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.3 }}
+                        className="text-muted-foreground text-sm tracking-wide"
+                    >
                         {isLogin ? 'Enter credentials to access the network' : 'Register your identity'}
-                    </p>
+                    </motion.p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -370,7 +401,15 @@ const AuthForm = () => {
                         </div>
                     )}
 
-                    <GameButton className="w-full mt-6" type="submit" disabled={loading || !isFormValid()} glow size="lg">
+                    <GameButton
+                        as={motion.button}
+                        whileTap={{ scale: 0.95 }}
+                        className="w-full mt-6"
+                        type="submit"
+                        disabled={loading || !isFormValid()}
+                        glow
+                        size="lg"
+                    >
                         {loading ? 'Processing...' : (isLogin ? 'Access System' : 'Initialize Profile')}
                         {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
                     </GameButton>
@@ -389,12 +428,7 @@ const AuthForm = () => {
                     <div className="text-muted-foreground">
                         {isLogin ? "New user? " : "Existing access? "}
                         <button
-                            onClick={() => {
-                                setIsLogin(!isLogin);
-                                setErrors({});
-                                setFormData({ ...formData, username: '', password: '', confirmPassword: '' });
-                                setUsernameAvailable(null); // Reset username availability when switching forms
-                            }}
+                            onClick={handleSwitchMode}
                             className="text-primary font-bold hover:text-accent transition-colors uppercase tracking-wider"
                         >
                             {isLogin ? 'Initialize' : 'Log In'}

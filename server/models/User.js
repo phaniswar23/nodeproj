@@ -2,54 +2,68 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-    // Email removed as per requirements
-    // email: { type: String, ... }
-    password: {
-        type: String,
-        required: true,
-        minlength: 6,
-        select: false, // Don't return password by default
-    },
+    // Core Auth
     username: {
         type: String,
         required: true,
         unique: true,
         trim: true,
     },
+    password: {
+        type: String,
+        required: true,
+        minlength: 6,
+        select: false,
+    },
+    // Deprecated: Migrating to profile.display_name, but keeping for backward compat if needed or mapping it
     full_name: {
         type: String,
         required: true,
     },
-    avatar_url: {
-        type: String,
-        default: null,
+
+    // NEW: Nested Profile Object
+    profile: {
+        display_name: { type: String, default: '' },
+        bio: { type: String, default: '' },
+
+        // Asset System
+        // Avatar: Stored as ID string (e.g. 'avatar_023') or URL for uploads
+        avatarId: { type: String, default: 'avatar_default' },
+
+        // Banner: Stored as object { type, value }
+        banner: {
+            type: { type: String, enum: ['color', 'image', 'gradient', 'preset'], default: 'color' },
+            value: { type: String, default: '#7289da' } // Default Discord-ish blurple
+        },
+
+        // Socials
+        discord_link: { type: String, default: '' },
+        instagram_username: { type: String, default: '' },
+
+        // Settings
+        is_private: { type: Boolean, default: false },
     },
-    banner_url: {
-        type: String,
-        default: null,
-    },
-    bio: {
-        type: String,
-        default: null,
-    },
-    discord_link: {
-        type: String,
-        default: null,
-    },
-    instagram_username: {
-        type: String,
-        default: null,
-    },
-    is_private: {
+
+    // Legacy/Root fields mapping (optional cleanup later, keeping for safety now)
+    avatar_url: { type: String, default: null }, // Deprecated in favor of profile.avatar
+    banner_url: { type: String, default: null }, // Deprecated in favor of profile.banner
+    bio: { type: String, default: null },        // Deprecated
+    discord_link: { type: String, default: null }, // Deprecated
+    instagram_username: { type: String, default: null }, // Deprecated
+    is_private: { type: Boolean, default: false }, // Deprecated
+
+    is_disabled: {
         type: Boolean,
         default: false,
     },
+
+    // Security
     hint_question: {
         type: String,
         required: true,
     },
     hint_answer: {
-        type: String, // Ideally this should be hashed too, but for parity with current app we keep it simple for now, or match current implementation
+        type: String,
         required: true,
         select: false,
     },
@@ -68,26 +82,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generate and hash password reset token
-userSchema.methods.getResetPasswordToken = function () {
-    // Generate token
-    const resetToken =
-        Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15);
-
-    // Hash token and set to resetPasswordToken field
-    // In a real app we'd hash it. For simplicity we'll store it directly or hash it.
-    // Let's store direct for MVP to match "simple" requirement, but hashing is better.
-    // We'll store it directly for now as per "simplify" instruction.
-    this.resetPasswordToken = resetToken;
-
-    // Set expire (10 minutes)
-    this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-
-    return resetToken;
-};
-
-// Encrypt password and hint_answer using bcrypt
+// Encrypt password + sync fields pre-save
 userSchema.pre('save', async function (next) {
     if (this.isModified('password')) {
         this.password = await bcrypt.hash(this.password, 10);
@@ -95,6 +90,13 @@ userSchema.pre('save', async function (next) {
 
     if (this.isModified('hint_answer')) {
         this.hint_answer = await bcrypt.hash(this.hint_answer, 10);
+    }
+
+    // Sync root fields to/from profile if needed (simple migration strategy)
+    // For new users, we prioritize profile.*. For old, we might need to migrate on fetch/save.
+    // Here we ensure display_name defaults to full_name if empty
+    if (!this.profile.display_name && this.full_name) {
+        this.profile.display_name = this.full_name;
     }
 
     next();
