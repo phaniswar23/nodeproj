@@ -3,7 +3,13 @@ import Room from '../models/Room.js';
 import RoomPlayer from '../models/RoomPlayer.js';
 import Message from '../models/Message.js';
 import protect from '../middleware/auth.js';
-import mongoose from 'mongoose'; // Added import
+import mongoose from 'mongoose';
+import { getRandomWordPair } from '../data/words.js';
+
+// ... (inside route)
+
+// Initialize game state with words
+
 import { v4 as uuidv4 } from 'uuid'; // Actually we might use shortid or custom code.
 // For now, let's just use a simple random string generator for room codes
 
@@ -396,9 +402,13 @@ router.post('/:id/start', protect, validateId, async (req, res) => {
         room.status = 'playing';
         room.current_round = 1;
 
-        // Initialize game state with words (Mocking for now, or fetch from DB/List)
-        // Ideally we pick words here.
-        const mockWords = { main: "Apple", imposter: "Orange" };
+        // Initialize game state with words
+        let wordPair;
+        if (room.word_difficulty === 'custom' && room.custom_words?.length > 0) {
+            wordPair = room.custom_words[Math.floor(Math.random() * room.custom_words.length)];
+        } else {
+            wordPair = getRandomWordPair(room.word_difficulty);
+        }
 
         // Find players to pick imposter
         const players = await RoomPlayer.find({ room_id: room._id, is_approved: true });
@@ -408,7 +418,7 @@ router.post('/:id/start', protect, validateId, async (req, res) => {
 
             room.game_state = {
                 phase: 'word',
-                word_pair: mockWords,
+                word_pair: wordPair,
                 imposter_id: imposter.user_id,
                 response_order: players.map(p => p.user_id).sort(() => Math.random() - 0.5),
                 current_player_index: 0,

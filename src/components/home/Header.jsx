@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useSettings } from '@/context/SettingsContext';
-import { Gamepad2, User, LogOut, Bell, Users, Settings } from 'lucide-react';
+import { Gamepad2, User, LogOut, Bell, Users, Settings, Circle, Moon, MinusCircle, Disc, ChevronRight } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -11,6 +11,11 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuSubContent,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
@@ -18,6 +23,10 @@ import { ThemeSwitcher } from '@/components/theme/ThemeSwitcher';
 import { cn } from '@/lib/utils';
 import { ProfileCard } from '@/components/profile/ProfileCard';
 import { getAvatarUrl } from '@/lib/avatarUtils';
+
+// ... imports
+import { StatusAvatar } from '@/components/status/StatusAvatar';
+import { Menu } from 'lucide-react';
 
 export const Header = () => {
     const { user, signOut } = useAuth();
@@ -27,6 +36,7 @@ export const Header = () => {
     const [pendingRequests, setPendingRequests] = useState(0);
     const [pendingInvites, setPendingInvites] = useState(0);
 
+    // Initial load
     useEffect(() => {
         if (user) {
             fetchProfile();
@@ -49,15 +59,29 @@ export const Header = () => {
         try {
             const { data } = await api.get('/friends/requests');
             setPendingRequests(data.length || 0);
-            // Invites endpoint TBD
-            // const { data: invites } = await api.get('/invites');
-            // setPendingInvites(invites?.length || 0);
         } catch (e) {
             console.error(e);
         }
     };
 
+    const handleStatusChange = async (newStatus) => {
+        try {
+            // Optimistic update
+            setProfile(prev => ({
+                ...prev,
+                profile: { ...prev.profile, status: newStatus }
+            }));
 
+            await api.put(`/users/${user._id}/profile`, {
+                profile: { status: newStatus }
+            });
+            toast.success(`Status updated`);
+        } catch (error) {
+            console.error("Failed to update status", error);
+            toast.error("Failed to update status");
+            fetchProfile(); // Revert
+        }
+    };
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/40 h-16 transition-all duration-200">
@@ -76,10 +100,6 @@ export const Header = () => {
                 <div className="flex items-center gap-2 sm:gap-4">
                     {/* Utility Group */}
                     <div className="flex items-center gap-1 sm:gap-2 pr-2 sm:pr-4 border-r border-border/40">
-                        <div className="opacity-70 hover:opacity-100 transition-opacity duration-150 active:scale-95 transform">
-                            <ThemeSwitcher />
-                        </div>
-
                         <Link to="/friends" className="focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md">
                             <button className="relative w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all duration-150 hover:scale-105 active:scale-95">
                                 <Users className="w-5 h-5" />
@@ -99,21 +119,18 @@ export const Header = () => {
                         </Link>
                     </div>
 
-                    {/* Profile Avatar - Dropdown Menu */}
+                    {/* NEW: Status Avatar (Independent) */}
+                    <StatusAvatar
+                        user={user}
+                        profile={profile}
+                        onStatusChange={handleStatusChange}
+                    />
+
+                    {/* SYSTEM MENU (Dropdown) */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <button className="group relative flex items-center gap-3 outline-none rounded-full focus-visible:ring-2 focus-visible:ring-primary transition-transform active:scale-95 duration-150">
-                                <div className="hidden sm:flex flex-col items-end mr-1 animate-slide-in-right">
-                                    <span className="text-sm font-bold leading-none text-foreground group-hover:text-primary transition-colors duration-200">
-                                        {profile?.full_name || 'Player'}
-                                    </span>
-                                </div>
-                                <Avatar className="w-10 h-10 border-2 border-border group-hover:border-primary transition-colors duration-200 shadow-sm animate-idle">
-                                    <AvatarImage src={getAvatarUrl(profile || user)} className="object-cover" />
-                                    <AvatarFallback className="bg-muted text-muted-foreground font-heading font-bold">
-                                        {profile?.full_name?.charAt(0) || 'P'}
-                                    </AvatarFallback>
-                                </Avatar>
+                            <button className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                                <Menu className="w-5 h-5" />
                             </button>
                         </DropdownMenuTrigger>
 
@@ -127,6 +144,7 @@ export const Header = () => {
                                 </div>
                             </DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-border/40" />
+
                             <DropdownMenuItem
                                 asChild
                                 className="cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors duration-150"
@@ -136,6 +154,51 @@ export const Header = () => {
                                     <span>Profile</span>
                                 </Link>
                             </DropdownMenuItem>
+
+                            {/* Status Submenu */}
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors duration-150">
+                                    {(() => {
+                                        const s = profile?.profile?.status || 'online';
+                                        return (
+                                            <>
+                                                {s === 'online' && <Circle className="mr-2 h-4 w-4 text-green-500 fill-current" />}
+                                                {s === 'dnd' && <MinusCircle className="mr-2 h-4 w-4 text-red-500 fill-current" />}
+                                                {s === 'offline' && <Disc className="mr-2 h-4 w-4 text-gray-500 fill-current" />}
+                                                <span>Status</span>
+                                            </>
+                                        );
+                                    })()}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-56 bg-popover/95 backdrop-blur-xl border-border/40 shadow-xl ml-1">
+                                    <DropdownMenuItem onClick={() => handleStatusChange('online')} className="cursor-pointer">
+                                        <Circle className="mr-2 h-4 w-4 text-green-500 fill-current" />
+                                        <div className="flex flex-col">
+                                            <span>Online</span>
+                                        </div>
+                                        {(profile?.profile?.status === 'online' || !profile?.profile?.status) && <ChevronRight className="ml-auto h-4 w-4" />}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleStatusChange('dnd')} className="cursor-pointer">
+                                        <MinusCircle className="mr-2 h-4 w-4 text-red-500 fill-current" />
+                                        <div className="flex flex-col">
+                                            <span>Do Not Disturb</span>
+                                            <span className="text-xs text-muted-foreground">You will not receive desktop notifications</span>
+                                        </div>
+                                        {profile?.profile?.status === 'dnd' && <ChevronRight className="ml-auto h-4 w-4" />}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => handleStatusChange('offline')} className="cursor-pointer">
+                                        <Disc className="mr-2 h-4 w-4 text-gray-500 fill-current" />
+                                        <div className="flex flex-col">
+                                            <span>Invisible</span>
+                                            <span className="text-xs text-muted-foreground">You will appear offline</span>
+                                        </div>
+                                        {profile?.profile?.status === 'offline' && <ChevronRight className="ml-auto h-4 w-4" />}
+                                    </DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+
                             <DropdownMenuItem
                                 asChild
                                 className="cursor-pointer focus:bg-primary/10 focus:text-primary transition-colors duration-150"
@@ -158,6 +221,7 @@ export const Header = () => {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+
                 </div>
             </div>
             {showProfileCard && (

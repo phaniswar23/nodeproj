@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Upload, Grid, Palette, Image as ImageIcon, Sparkles, Filter } from "lucide-react";
+import { Upload, Grid, Palette, Image as ImageIcon, Sparkles, Filter, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // --- Mock Data Generators ---
@@ -43,6 +43,7 @@ const AssetPicker = ({ type = 'avatar', onSelect }) => {
     // Default tab based on type
     const [selectedTab, setSelectedTab] = useState(isBanner ? 'color' : 'presets');
     const [selectedCategory, setSelectedCategory] = useState('All');
+    const [visibleCount, setVisibleCount] = useState(40);
 
     const handleFileChange = (e) => {
         const file = e.target.files[0];
@@ -70,6 +71,11 @@ const AssetPicker = ({ type = 'avatar', onSelect }) => {
     const filteredAvatars = useMemo(() => {
         if (selectedCategory === 'All') return AVATAR_PRESETS;
         return AVATAR_PRESETS.filter(p => p.category === selectedCategory);
+    }, [selectedCategory]);
+
+    // Reset pagination when category changes
+    React.useEffect(() => {
+        setVisibleCount(40);
     }, [selectedCategory]);
 
     return (
@@ -122,40 +128,68 @@ const AssetPicker = ({ type = 'avatar', onSelect }) => {
                 <div className="flex-1 overflow-hidden bg-[#313338] relative flex flex-col">
 
                     {/* PRESETS TAB */}
-                    <TabsContent value="presets" className="flex-1 h-full m-0 p-0 overflow-y-auto custom-scrollbar">
-                        <div className={cn("p-4 grid gap-3", isBanner ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-3 sm:grid-cols-5")}>
-                            {isBanner ? (
-                                BANNER_PRESETS.map((item) => (
+                    <TabsContent value="presets" className="flex-1 mt-4 relative px-4 pb-4">
+                        <div
+                            className="h-[450px] overflow-y-auto custom-scrollbar p-4 bg-[#111214]/50 border border-white/10 rounded-xl shadow-inner scroll-smooth"
+                            onScroll={(e) => {
+                                const { scrollTop, scrollHeight, clientHeight } = e.target;
+                                if (scrollHeight - scrollTop <= clientHeight + 100) {
+                                    if (visibleCount < filteredAvatars.length) {
+                                        setVisibleCount(prev => Math.min(prev + 40, filteredAvatars.length));
+                                    }
+                                }
+                            }}
+                        >
+                            <div className={cn("grid gap-3", isBanner ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-4 sm:grid-cols-5")}>
+                                {isBanner ? (
+                                    BANNER_PRESETS.slice(0, visibleCount).map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                console.log("AssetPicker: Selected Banner Preset", item);
+                                                onSelect({ type: 'preset', value: item.value });
+                                            }}
+                                            className="aspect-video w-full rounded-lg overflow-hidden ring-2 ring-transparent hover:ring-white transition-all focus:outline-none focus:ring-[#5865F2] shadow-sm group relative"
+                                            style={{ background: item.value }}
+                                        >
+                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <Sparkles className="w-4 h-4 text-white drop-shadow-md" />
+                                            </div>
+                                        </button>
+                                    ))
+                                ) : (
+                                    filteredAvatars.slice(0, visibleCount).map((item) => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => {
+                                                console.log("AssetPicker: Selected Avatar Preset", item.id);
+                                                onSelect(item.id);
+                                            }}
+                                            className="aspect-square w-full rounded-xl bg-[#202225] overflow-hidden ring-2 ring-transparent hover:ring-white transition-all focus:outline-none focus:ring-[#5865F2] flex items-center justify-center relative group cursor-pointer"
+                                        >
+                                            <img src={item.url} alt="Preset" className="w-full h-full object-cover pointer-events-none transition-transform duration-500 group-hover:scale-110" loading="lazy" />
+
+                                            {/* Hover Overlay */}
+                                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                                                <div className="bg-white/10 p-1.5 rounded-full backdrop-blur-md">
+                                                    <Check className="w-4 h-4 text-white" />
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+
+                            {/* Load More Trigger / Loading State */}
+                            {visibleCount < filteredAvatars.length && (
+                                <div className="py-8 text-center">
                                     <button
-                                        key={item.id}
-                                        onClick={() => {
-                                            console.log("AssetPicker: Selected Banner Preset", item);
-                                            onSelect({ type: 'preset', value: item.value });
-                                        }}
-                                        className="aspect-video w-full rounded-lg overflow-hidden ring-2 ring-transparent hover:ring-white transition-all focus:outline-none focus:ring-[#5865F2] shadow-sm group relative"
-                                        style={{ background: item.value }}
+                                        onClick={() => setVisibleCount(prev => Math.min(prev + 40, filteredAvatars.length))}
+                                        className="text-xs font-bold text-gray-500 uppercase tracking-widest hover:text-white transition-colors"
                                     >
-                                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                            <Sparkles className="w-4 h-4 text-white drop-shadow-md" />
-                                        </div>
+                                        Load More
                                     </button>
-                                ))
-                            ) : (
-                                filteredAvatars.map((item) => (
-                                    <button
-                                        key={item.id}
-                                        onClick={() => {
-                                            console.log("AssetPicker: Selected Avatar Preset", item.id);
-                                            onSelect(item.id);
-                                        }}
-                                        className="aspect-square w-full rounded-full bg-[#202225] overflow-hidden ring-2 ring-transparent hover:ring-white transition-all focus:outline-none focus:ring-[#5865F2] flex items-center justify-center relative group cursor-pointer"
-                                    >
-                                        <img src={item.url} alt="Preset" className="w-full h-full object-cover pointer-events-none" loading="lazy" />
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                                            <span className="text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all">Select</span>
-                                        </div>
-                                    </button>
-                                ))
+                                </div>
                             )}
                         </div>
                     </TabsContent>

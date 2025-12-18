@@ -108,16 +108,19 @@ router.put('/:id/profile', protect, async (req, res) => {
             if (p.pronouns !== undefined) user.profile.pronouns = p.pronouns;
             if (p.bio !== undefined) user.profile.bio = p.bio;
             if (p.is_private !== undefined) user.profile.is_private = p.is_private;
+            if (p.status !== undefined) user.profile.status = p.status;
 
             // Assets (Avatar/Banner)
+            if (p.avatarId) user.profile.avatarId = p.avatarId;
+            // Legacy / Compat support if needed, or remove if strict
             if (p.avatar) {
-                user.profile.avatar = { ...user.profile.avatar, ...p.avatar };
-                // Back-fill root for compat
-                if (p.avatar.value) user.avatar_url = p.avatar.value;
+                // If client sends object, try to extract value, mainly for backward compat handling
+                // But sticking to avatarId as primary source of truth
             }
+
             if (p.banner) {
                 user.profile.banner = { ...user.profile.banner, ...p.banner };
-                // Back-fill root
+                // Back-fill root for compat
                 if (p.banner.value) user.banner_url = p.banner.value;
             }
 
@@ -144,35 +147,7 @@ router.put('/:id/profile', protect, async (req, res) => {
     }
 });
 
-// @desc    Delete user account
-// @route   POST /api/users/delete-account
-// @access  Private
-router.post('/delete-account', protect, async (req, res) => {
-    try {
-        const { password } = req.body;
-        const user = await User.findById(req.user._id).select('+password');
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Verify Password
-        if (!(await user.matchPassword(password))) {
-            return res.status(401).json({ message: 'Incorrect password' });
-        }
-
-        // Delete User Data & Sub-resources
-        await ProfileStats.deleteOne({ user_id: user._id });
-        // Future: Delete uploaded assets from Cloudinary if we integrate it here
-
-        await User.deleteOne({ _id: user._id });
-
-        res.json({ success: true, message: 'Account deleted successfully' });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message });
-    }
-});
 
 // @desc    Disable user account
 // @route   POST /api/users/disable-account

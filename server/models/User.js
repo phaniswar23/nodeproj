@@ -42,6 +42,7 @@ const userSchema = new mongoose.Schema({
 
         // Settings
         is_private: { type: Boolean, default: false },
+        status: { type: String, enum: ['online', 'idle', 'dnd', 'offline'], default: 'online' },
     },
 
     // Legacy/Root fields mapping (optional cleanup later, keeping for safety now)

@@ -17,10 +17,14 @@ export function ThemeProvider({
         () => localStorage.getItem(storageKey) || defaultTheme
     )
 
+    const [density, setDensity] = useState(
+        () => localStorage.getItem("ui-density") || "default"
+    )
+
     useEffect(() => {
         const root = window.document.documentElement
 
-        root.classList.remove("light", "dark")
+        root.classList.remove("light", "dark", "gray", "black")
 
         if (theme === "system") {
             const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
@@ -29,11 +33,15 @@ export function ThemeProvider({
                 : "light"
 
             root.classList.add(systemTheme)
-            return
+        } else {
+            root.classList.add(theme)
         }
-
-        root.classList.add(theme)
     }, [theme])
+
+    useEffect(() => {
+        const root = window.document.documentElement
+        root.setAttribute("data-density", density)
+    }, [density])
 
     const value = {
         theme,
@@ -41,6 +49,11 @@ export function ThemeProvider({
             localStorage.setItem(storageKey, theme)
             setTheme(theme)
         },
+        density,
+        setDensity: (newDensity) => {
+            localStorage.setItem("ui-density", newDensity)
+            setDensity(newDensity)
+        }
     }
 
     return (

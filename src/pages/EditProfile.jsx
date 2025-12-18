@@ -59,17 +59,34 @@ const EditProfile = () => {
     const handleSave = async () => {
         setLoading(true);
         console.log("EditProfile: Saving...", { ...info, avatarId, banner });
+
+        if (!user?._id) {
+            toast.error("User ID missing. Try logging in again.");
+            setLoading(false);
+            return;
+        }
+
         try {
             // Consolidated Update
-            // API: PUT /api/profile
-            await api.put('/profile', {
-                ...info,
-                avatarId,
-                banner
+            // API: PUT /api/users/:id/profile
+            await api.put(`/users/${user._id}/profile`, {
+                profile: {
+                    display_name: info.displayName,
+                    bio: info.bio,
+                    instagram_username: info.instagramUsername,
+                    discord_link: info.discordLink,
+                    is_private: info.privateProfile,
+                    avatarId: avatarId, // Send ID directly (users.js will handle)
+                    banner: banner
+                }
             });
 
             toast.success("Profile changes saved successfully!");
-            await refreshUser(); // Reload user context
+            await refreshUser(); // Reload user context to reflect changes
+
+            // Optional: navigate back to profile on success? Prompt didn't say, but "returns to profile page" implies user does it manually or we guide them. 
+            // Stick to staying on page for now as per conventional "Save" button behavior unless explicit "Save & Exit"
+
         } catch (error) {
             console.error("Save error:", error);
             // Show more specific error if available
@@ -83,7 +100,11 @@ const EditProfile = () => {
     return (
         <div className="flex flex-col md:flex-row min-h-screen w-full bg-[#313338] overflow-y-auto md:overflow-hidden">
             {/* LEFT PANEL: Editor Controls */}
-            <div className="w-full md:w-[500px] h-auto md:h-full bg-[#1e1f22] border-r border-[#111214] flex flex-col shadow-2xl z-20 shrink-0">
+            <div className="w-full md:w-[500px] h-full bg-[#1e1f22] border-r border-[#111214] flex flex-col shadow-2xl z-20 shrink-0 relative">
+                {/* Mobile Fallback */}
+                <div className="md:hidden bg-yellow-500/10 border-b border-yellow-500/20 p-2 text-center">
+                    <p className="text-[10px] font-bold text-yellow-500 uppercase tracking-wider">Mobile editing coming soon</p>
+                </div>
                 {/* Header */}
                 <div className="p-6 border-b border-[#111214] flex items-center justify-between bg-[#111214]/50 backdrop-blur-md">
                     <div className="flex items-center gap-3">
@@ -125,9 +146,7 @@ const EditProfile = () => {
                                             className="bg-[#1e1f22] border-none focus:ring-1 focus:ring-[#5865f2]"
                                         />
                                     </div>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        {/* Pronouns Field Removed */}
-                                    </div>
+
                                     <div>
                                         <label className="text-[10px] font-bold text-[#b9bbbe] uppercase mb-1.5 block">Bio</label>
                                         <Textarea

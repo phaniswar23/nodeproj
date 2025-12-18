@@ -26,12 +26,22 @@ app.use(express.json());
 
 connectDB();
 
-/* ---------------- LIVE ROOM STATE ---------------- */
+/* ---------------- GLOBAL STATE ---------------- */
 const liveRooms = new Map();
+// Global Map: userId -> socketId (for direct invites/warnings)
+const userSockets = new Map();
 
 /* ---------------- SOCKET.IO ---------------- */
 io.on("connection", (socket) => {
-    console.log("Socket connected:", socket.id);
+    // console.log("Socket connected:", socket.id); // Verbose off
+    const { userId, username } = socket.handshake.query;
+
+    if (userId) {
+        userSockets.set(userId, socket.id);
+        console.log(`User mapped: ${username} -> ${socket.id}`);
+        // Broadcast online status to friends (could be optimized)
+        io.emit('online_users', Array.from(userSockets.keys()));
+    }
 
     /* ---------- HELPER: BROADCAST STATE ---------- */
     const broadcastLobbyState = (roomCode) => {
@@ -42,47 +52,54 @@ io.on("connection", (socket) => {
             roomCode: room.roomCode,
             hostId: room.hostId,
             settings: room.settings,
-            players: room.players
+            players: room.players,
+            status: room.status // waiting | starting | started
         };
 
         io.to(roomCode).emit("lobby_state", state);
     };
 
-    /* ---------- JOIN LOBBY (CRITICAL) ---------- */
+    /* ---------- HELPER: SEND CHAT ---------- */
+    const sendSystemMessage = (roomCode, message) => {
+        io.to(roomCode).emit("chat:receive", {
+            id: Date.now(),
+            user: "SYSTEM",
+            message,
+            time: new Date().toISOString(),
+            isSystem: true
+        });
+    };
+
+    /* ---------- JOIN LOBBY ---------- */
     socket.on("join_lobby", ({ roomCode, userId, username, avatar }) => {
-        // Validate Input
-        if (!roomCode || !userId) {
-            console.warn(`Join failed: Missing roomCode (${roomCode}) or userId (${userId})`);
-            return;
-        }
+        if (!roomCode || !userId) return;
 
         socket.join(roomCode);
 
-        // Initialize room if not exists
+        // CREATE ROOM
         if (!liveRooms.has(roomCode)) {
             liveRooms.set(roomCode, {
                 roomCode,
-                hostId: userId, // First joiner is host
+                hostId: userId,
                 settings: {
-                    difficulty: "Medium",
+                    difficulty: "medium",
                     rounds: 5,
                     responseTime: 40,
                     votingTime: 20
                 },
-                players: []
+                players: [],
+                status: 'waiting'
             });
-            console.log(`Created new lobby: ${roomCode} with Host: ${username} (${userId})`);
+            console.log(`New Lobby: ${roomCode}`);
         }
 
         const room = liveRooms.get(roomCode);
+        const existingPlayer = room.players.find(p => p.userId === userId);
 
-        // Prevent duplicates (update socketId if rejoining)
-        const existingPlayerIndex = room.players.findIndex(p => p.userId === userId);
-
-        if (existingPlayerIndex !== -1) {
-            room.players[existingPlayerIndex].socketId = socket.id;
-            room.players[existingPlayerIndex].username = username;
-            room.players[existingPlayerIndex].avatar = avatar;
+        if (existingPlayer) {
+            existingPlayer.socketId = socket.id;
+            existingPlayer.username = username;
+            existingPlayer.avatar = avatar;
         } else {
             room.players.push({
                 userId,
@@ -91,50 +108,121 @@ io.on("connection", (socket) => {
                 socketId: socket.id,
                 ready: false
             });
+            sendSystemMessage(roomCode, `🟢 ${username} joined the room`);
         }
 
-        // Broadcast State
         broadcastLobbyState(roomCode);
-        console.log(`User ${username} joined ${roomCode}. Total: ${room.players.length}`);
     });
 
-    /* ---------- UPDATE SETTINGS (HOST ONLY) ---------- */
+    /* ---------- LOBBY ACTIONS (HOST) ---------- */
     socket.on("update_lobby_settings", ({ roomCode, settings }) => {
+        const room = liveRooms.get(roomCode);
+        if (!room || room.hostId !== userId) return; // Basic auth check based on query param
+        // Better: check if socket.handshake.query.userId === room.hostId
+
+        room.settings = settings;
+        room.players.forEach(p => p.ready = false);
+        broadcastLobbyState(roomCode);
+        sendSystemMessage(roomCode, `⚙️ Settings updated`);
+    });
+
+    socket.on("kick_player", ({ roomCode, targetUserId }) => {
         const room = liveRooms.get(roomCode);
         if (!room) return;
 
-        const player = room.players.find(p => p.socketId === socket.id);
-        if (!player || player.userId !== room.hostId) {
-            console.warn(`Unauthorized settings update attempt by ${socket.id}`);
-            return;
-        }
+        // Host Check
+        if (room.hostId !== userId) return;
 
-        room.settings = settings;
-        room.players.forEach(p => p.ready = false); // Reset ready
+        const playerIdx = room.players.findIndex(p => p.userId === targetUserId);
+        if (playerIdx === -1) return;
 
+        const player = room.players[playerIdx];
+        const targetSocketId = player.socketId;
+
+        // Remove
+        room.players.splice(playerIdx, 1);
+
+        // Notify Target
+        io.to(targetSocketId).emit("kicked_from_lobby");
+        io.sockets.sockets.get(targetSocketId)?.leave(roomCode);
+
+        // Notify Room
+        sendSystemMessage(roomCode, `❌ ${player.username} was removed by host`);
         broadcastLobbyState(roomCode);
     });
 
-    /* ---------- LEAVE LOBBY ---------- */
+    /* ---------- PLAYER ACTIONS ---------- */
+    socket.on("toggle_ready", ({ roomCode }) => {
+        const room = liveRooms.get(roomCode);
+        if (!room) return;
+
+        const player = room.players.find(p => p.userId === userId);
+        if (player) {
+            player.ready = !player.ready;
+            broadcastLobbyState(roomCode);
+
+            // Check if all ready
+            const allReady = room.players.length >= 2 && room.players.every(p => p.ready);
+            if (allReady) {
+                sendSystemMessage(roomCode, `✅ All players are ready!`);
+            }
+        }
+    });
+
+    socket.on("invite_friend", ({ toUserId, roomCode }) => {
+        const targetSocketId = userSockets.get(toUserId);
+        const room = liveRooms.get(roomCode);
+
+        if (targetSocketId) {
+            io.to(targetSocketId).emit("invite_received", {
+                roomId: roomCode,
+                roomName: room?.settings?.difficulty ? `${room.settings.difficulty} Room` : "Game Room",
+                from: { username: username }
+            });
+            // Optional: Notify sender/room?
+        }
+    });
+
+    socket.on("start_game", ({ roomCode }) => {
+        const room = liveRooms.get(roomCode);
+        if (!room || room.hostId !== userId) return;
+
+        room.status = 'starting';
+        broadcastLobbyState(roomCode);
+        sendSystemMessage(roomCode, `🎮 Game Starting!`);
+
+        // Simulate start delay
+        setTimeout(() => {
+            room.status = 'started';
+            io.to(roomCode).emit("game_started"); // Frontend should nav to /game/:id
+        }, 1000);
+    });
+
+    /* ---------- LEAVE / DISCONNECT ---------- */
     const handleLeave = () => {
+        // userSockets Map Cleanup
+        if (userId) {
+            userSockets.delete(userId);
+            io.emit('online_users', Array.from(userSockets.keys()));
+        }
+
+        // Room Cleanup
         for (const [code, room] of liveRooms.entries()) {
-            const playerIndex = room.players.findIndex(p => p.socketId === socket.id);
-            if (playerIndex !== -1) {
-                const player = room.players[playerIndex];
-                room.players.splice(playerIndex, 1); // Remove
+            const index = room.players.findIndex(p => p.socketId === socket.id);
+            if (index !== -1) {
+                const p = room.players[index];
+                room.players.splice(index, 1);
+                sendSystemMessage(code, `🔴 ${p.username} left`);
 
                 if (room.players.length === 0) {
                     liveRooms.delete(code);
-                    console.log(`Lobby ${code} deleted (empty)`);
                 } else {
-                    // Host Migration
-                    if (player.userId === room.hostId) {
+                    if (room.hostId === p.userId) {
                         room.hostId = room.players[0].userId;
-                        console.log(`Host migrated to ${room.players[0].username} in ${code}`);
+                        sendSystemMessage(code, `👑 Host migrated to ${room.players[0].username}`);
                     }
                     broadcastLobbyState(code);
                 }
-                console.log(`User ${player.username} left ${code}`);
                 break;
             }
         }
@@ -143,35 +231,19 @@ io.on("connection", (socket) => {
     socket.on("leave_lobby", handleLeave);
     socket.on("disconnect", handleLeave);
 
-    /* ---------- TOGGLE READY ---------- */
-    socket.on("toggle_ready", ({ roomCode }) => {
-        const room = liveRooms.get(roomCode);
-        if (!room) return;
-
-        const player = room.players.find(p => p.socketId === socket.id);
-        if (player) {
-            player.ready = !player.ready;
-            broadcastLobbyState(roomCode);
-        }
-    });
-
     /* ---------- CHAT ---------- */
-    socket.on("chat:send", ({ roomCode, user, message }) => {
-        const msgPayload = {
+    socket.on("chat:send", ({ roomCode, message }) => {
+        io.to(roomCode).emit("chat:receive", {
             id: Date.now(),
-            user: user.username,
+            user: username, // Trusted from handshake
             message,
             time: new Date().toISOString()
-        };
-        io.to(roomCode).emit("chat:receive", msgPayload);
+        });
     });
-
 });
 
 /* ---------------- ROUTES ---------------- */
-app.get("/", (req, res) => {
-    res.send("Word Imposter API running");
-});
+app.get("/", (req, res) => res.send("Word Imposter API running"));
 
 import authRoutes from "./routes/auth.js";
 import roomRoutes from "./routes/rooms.js";
@@ -184,8 +256,8 @@ import accountRoutes from "./routes/account.js";
 app.use("/api/auth", authRoutes);
 app.use("/api/rooms", roomRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/profile", profileRoutes); // New
-app.use("/api/account", accountRoutes); // New STRICT requirement
+app.use("/api/profile", profileRoutes);
+app.use("/api/account", accountRoutes);
 app.use("/api/friends", friendRoutes);
 app.use("/api/messages", messageRoutes);
 

@@ -23,6 +23,22 @@ export const SecuritySettings = () => {
     const [deletePassword, setDeletePassword] = useState('');
     const [loadingDelete, setLoadingDelete] = useState(false);
 
+    // Disable Account State
+    const [showDisableModal, setShowDisableModal] = useState(false);
+    const [loadingDisable, setLoadingDisable] = useState(false);
+
+    const handleDisableAccount = async () => {
+        setLoadingDisable(true);
+        try {
+            await api.post('/users/disable-account');
+            toast.success("Account disabled. Logging out...");
+            signOut();
+        } catch (error) {
+            toast.error(error.response?.data?.message || "Failed to disable account");
+            setLoadingDisable(false);
+        }
+    };
+
     const handleChangePassword = async () => {
         if (!currentPassword || !newPassword || !confirmPassword) {
             toast.error("Please fill all fields");
@@ -55,8 +71,8 @@ export const SecuritySettings = () => {
     const handleDeleteAccount = async () => {
         setLoadingDelete(true);
         try {
-            // API: DELETE /api/account
-            await api.delete('/account', { data: { password: deletePassword } });
+            // API: DELETE /api/auth/delete-account
+            await api.delete('/auth/delete-account', { data: { password: deletePassword } });
             toast.success("Account deleted. Goodbye!");
             signOut();
         } catch (error) {
@@ -124,6 +140,27 @@ export const SecuritySettings = () => {
                 </div>
             </div>
 
+            {/* Disable Account Section */}
+            <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-6">
+                <div className="flex items-start gap-4">
+                    <div className="p-3 bg-yellow-500/10 rounded-lg">
+                        <AlertTriangle className="w-6 h-6 text-yellow-500" />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-white">Disable Account</h3>
+                        <p className="text-sm text-yellow-200/60 mb-4">
+                            Temporarily disable your account. You can reactivate it by logging in again.
+                        </p>
+                        <button
+                            onClick={() => setShowDisableModal(true)}
+                            className="px-4 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-500 text-sm font-bold rounded-lg border border-yellow-500/20 transition-colors flex items-center gap-2"
+                        >
+                            <AlertTriangle className="w-4 h-4" /> Disable Account
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Delete Account Section */}
             <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-6">
                 <div className="flex items-start gap-4">
@@ -144,6 +181,36 @@ export const SecuritySettings = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Disable Confirmation Modal */}
+            <Dialog open={showDisableModal} onOpenChange={setShowDisableModal}>
+                <DialogContent className="bg-[#111214] border-yellow-500/20">
+                    <DialogHeader>
+                        <DialogTitle className="text-yellow-500 font-bold flex items-center gap-2">
+                            <AlertTriangle className="w-5 h-5" /> Disable Account?
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-400">
+                            Are you sure you want to disable your account? You will be logged out immediately.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <DialogFooter>
+                        <button
+                            onClick={() => setShowDisableModal(false)}
+                            className="px-4 py-2 rounded-lg text-sm font-bold text-gray-400 hover:text-white"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleDisableAccount}
+                            disabled={loadingDisable}
+                            className="px-4 py-2 rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {loadingDisable ? "Disabling..." : "Confirm Disable"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Delete Confirmation Modal */}
             <Dialog open={showDeleteModal} onOpenChange={setShowDeleteModal}>

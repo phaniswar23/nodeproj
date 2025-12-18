@@ -5,15 +5,24 @@ import { useSocket } from '@/hooks/useSocket';
 import { Header } from '@/components/home/Header';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { GameButton } from '@/components/ui/GameButton';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from 'sonner';
 import {
-    Users, Crown, Copy, Play, LogOut, Settings, Clock, Check, Send, Lock, MessageSquare, Save, AlertTriangle
+    Users, Crown, Copy, Play, LogOut, Settings, Clock, Check, Send, Lock, MessageSquare, Save, AlertTriangle, MoreVertical, Ban, UserPlus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { InviteFriendsModal } from '@/components/game/InviteFriendsModal';
 
 const Room = () => {
     // Extract roomCode ONLY from URL
@@ -28,11 +37,12 @@ const Room = () => {
         hostId: '',
         players: [],
         settings: {
-            difficulty: 'Medium',
+            difficulty: 'medium',
             rounds: 5,
             responseTime: 40,
             votingTime: 20
-        }
+        },
+        status: 'waiting'
     });
 
     // UI State
@@ -40,6 +50,7 @@ const Room = () => {
     const [messageInput, setMessageInput] = useState("");
     const [loading, setLoading] = useState(true);
     const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+    const [showInviteModal, setShowInviteModal] = useState(false);
     const [copied, setCopied] = useState(false);
     const [draftSettings, setDraftSettings] = useState(lobbyState.settings);
 
@@ -55,24 +66,32 @@ const Room = () => {
         if (!roomCodeFromUrl || !user || !socket) return;
         if (joinedRef.current) return;
 
-        const joinLobby = () => {
-            console.log("Joining lobby with code:", roomCodeFromUrl);
-            // Emit join_lobby immediately using URL param
-            socket.emit('join_lobby', {
-                roomCode: roomCodeFromUrl,
-                userId: user._id,
-                username: user.username,
-                avatar: user.avatar_url
-            });
+        console.log("Joining lobby with code:", roomCodeFromUrl);
+        // Emit join_lobby immediately using URL param
+        socket.emit('join_lobby', {
+            roomCode: roomCodeFromUrl,
+            userId: user._id,
+            username: user.username,
+            avatar: user.avatar_url
+        });
 
-            joinedRef.current = true;
-            setLoading(false); // Stop loading spinner immediately, UI will hydrate from socket event
+        joinedRef.current = true;
+        setLoading(false); // Stop loading spinner immediately, UI will hydrate from socket event
+
+        // Listen for kicked event
+        socket.on('kicked_from_lobby', () => {
+            toast.error("You were removed from the room");
+            navigate('/');
+        });
+
+        socket.on('game_started', () => {
+            navigate(`/game/${roomCodeFromUrl}`);
+        });
+
+        return () => {
+            socket.off('kicked_from_lobby');
+            socket.off('game_started');
         };
-
-        joinLobby();
-
-        // No cleanup to leave_lobby here to prevent accidental leaves on re-renders,
-        // user must click Leave button or close tab (disconnect handles it).
     }, [roomCodeFromUrl, user, socket]);
 
     // 2. Socket Listeners (State Sync)
@@ -82,11 +101,7 @@ const Room = () => {
         socket.on('lobby_state', (state) => {
             console.log("Lobby State Updated:", state);
             setLobbyState(state);
-            // Sync draft settings if invalid or if I am not host (view mode)
-            // Or simplified: Just sync draft to incoming settings always (unless I am typing? slider doesn't lock usually)
-            // Let's safe sync:
-            // If I am host and hasUnsavedChanges is true, DO NOT overwrite my draft.
-            // If I am NOT host, always overwrite.
+            // Sync settings if not host
             if (!isHost) {
                 setDraftSettings(state.settings);
             }
@@ -101,7 +116,7 @@ const Room = () => {
             socket.off('lobby_state');
             socket.off('chat:receive');
         };
-    }, [socket, isHost]); // Re-bind if host status changes? Actually safe to keep live.
+    }, [socket, isHost]);
 
     const handleSaveSettings = () => {
         if (!socket || !lobbyState.roomCode) return;
@@ -126,7 +141,6 @@ const Room = () => {
         if (!messageInput.trim() || !socket) return;
         socket.emit('chat:send', {
             roomCode: lobbyState.roomCode,
-            user: { username: user.username },
             message: messageInput.trim()
         });
         setMessageInput("");
@@ -138,8 +152,16 @@ const Room = () => {
     };
 
     const handleStartGame = () => {
-        toast("Starting Game...");
-        // Logic to emit start_game
+        if (!socket) return;
+        socket.emit('start_game', { roomCode: lobbyState.roomCode });
+    };
+
+    const handleKickPlayer = (targetUserId) => {
+        if (!socket) return;
+        socket.emit('kick_player', {
+            roomCode: lobbyState.roomCode,
+            targetUserId
+        });
     };
 
     const copyCode = () => {
@@ -151,7 +173,7 @@ const Room = () => {
     if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>;
 
     const players = lobbyState.players || [];
-    const allReady = players.length >= 2 && players.every(p => p.ready);
+    const allReady = players.length >= 3 && players.every(p => p.ready);
 
     return (
         <div className="min-h-screen bg-background relative selection:bg-primary/30 pb-4 overflow-y-auto lg:overflow-hidden flex flex-col">
@@ -165,6 +187,9 @@ const Room = () => {
                         <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                             <Users className="w-4 h-4" /> Players <span className="text-white">{players.length}</span>
                         </h2>
+                        <GameButton size="sm" onClick={() => setShowInviteModal(true)} className="h-7 text-xs px-2">
+                            <UserPlus className="w-3 h-3 mr-1" /> Invite
+                        </GameButton>
                     </div>
                     <ScrollArea className="flex-1 -mr-3 pr-3">
                         <div className="flex flex-col gap-3">
@@ -172,12 +197,13 @@ const Room = () => {
                                 <GlassCard
                                     key={p.userId}
                                     className={cn(
-                                        "p-3 flex items-center gap-3 relative transition-all duration-300 border-l-4",
+                                        "p-3 flex items-center gap-3 relative transition-all duration-300 border-l-4 group",
                                         p.userId === user._id ? "bg-primary/5 border-l-primary" : "border-l-transparent hover:bg-white/5",
                                         p.ready ? "border-l-green-500 bg-green-500/5" : ""
                                     )}
                                 >
                                     <Avatar className="w-10 h-10 ring-2 ring-white/10">
+                                        <AvatarImage src={p.avatar} />
                                         <AvatarFallback className="bg-primary/20 text-primary font-bold text-xs">
                                             {p.username?.[0]?.toUpperCase()}
                                         </AvatarFallback>
@@ -192,17 +218,37 @@ const Room = () => {
                                             {p.ready ? "Ready" : "Not Ready"}
                                         </div>
                                     </div>
-                                    {p.userId === user._id && (
+
+                                    {/* Actions */}
+                                    {p.userId === user._id ? (
                                         <button
                                             onClick={handleToggleReady}
                                             className={cn(
-                                                "w-6 h-6 rounded-full flex items-center justify-center border transition-all",
-                                                p.ready ? "bg-green-500 border-green-500 text-black" : "border-white/20 hover:border-white/50 text-transparent hover:text-white/20"
+                                                "w-8 h-8 rounded-full flex items-center justify-center border transition-all",
+                                                p.ready ? "bg-green-500 border-green-500 text-black shadow-[0_0_10px_rgba(34,197,94,0.3)]" : "border-white/20 hover:border-white/50 text-white/50 hover:text-white hover:bg-white/10"
                                             )}
                                         >
-                                            <Check className="w-3 h-3" />
+                                            <Check className="w-4 h-4" />
                                         </button>
-                                    )}
+                                    ) : isHost ? (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded transition-opacity">
+                                                    <MoreVertical className="w-4 h-4 text-gray-400" />
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="bg-card border-white/10">
+                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                <DropdownMenuSeparator className="bg-white/10" />
+                                                <DropdownMenuItem
+                                                    onClick={() => handleKickPlayer(p.userId)}
+                                                    className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer"
+                                                >
+                                                    <Ban className="w-4 h-4 mr-2" /> Kick Player
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    ) : null}
                                 </GlassCard>
                             ))}
                         </div>
@@ -213,7 +259,7 @@ const Room = () => {
                 <div className="lg:col-span-5 flex flex-col items-center justify-center gap-8 relative py-8">
                     <div className="text-center space-y-4 w-full max-w-md">
                         <Badge variant="outline" className="animate-pulse border-primary/20 text-primary">
-                            Waiting for players
+                            {lobbyState.status === 'starting' ? 'Starting Game...' : `Waiting for players (${players.length} / 3)`}
                         </Badge>
                         <h1 className="text-5xl font-heading font-black tracking-tighter text-white">
                             Word Imposter
@@ -236,23 +282,30 @@ const Room = () => {
                         {isHost ? (
                             <GameButton
                                 size="xl"
-                                className="w-full py-8 text-xl shadow-2xl shadow-primary/20"
-                                disabled={!allReady}
+                                className="w-full py-8 text-xl shadow-2xl shadow-primary/20 relative overflow-hidden"
+                                disabled={!allReady || lobbyState.status === 'starting'}
                                 onClick={handleStartGame}
                             >
-                                START GAME
+                                {lobbyState.status === 'starting' ? (
+                                    <>Starting...</>
+                                ) : (
+                                    <>START GAME</>
+                                )}
                             </GameButton>
                         ) : (
                             <div className="text-center p-4 bg-white/5 rounded-xl border border-white/5">
                                 <p className="text-sm font-bold text-gray-400">Waiting for host to start...</p>
                             </div>
                         )}
-                        {!isHost && !allReady && players.length > 1 && (
+                        {!isHost && !allReady && players.length > 2 && (
                             <p className="text-center text-xs text-orange-400 mt-2">Waiting for all players to ready up</p>
+                        )}
+                        {!isHost && players.length < 3 && (
+                            <p className="text-center text-xs text-muted-foreground mt-2">Waiting for more players (Min 3)</p>
                         )}
 
                         <button
-                            onClick={handleLeaveRoom}
+                            onClick={() => setShowLeaveDialog(true)}
                             className="w-full py-3 text-xs font-bold text-gray-500 hover:text-white hover:bg-white/5 rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
                             <LogOut className="w-3 h-3" /> Leave Lobby
@@ -275,20 +328,25 @@ const Room = () => {
                             {/* Difficulty */}
                             <div className="space-y-2">
                                 <span className="text-[10px] font-bold text-gray-500 uppercase">Difficulty</span>
-                                <div className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded-lg">
-                                    {['Easy', 'Medium', 'Hard'].map((d) => (
+                                <div className="grid grid-cols-2 gap-1 bg-black/20 p-1 rounded-lg">
+                                    {[
+                                        { id: 'easy', label: 'Basic' },
+                                        { id: 'medium', label: 'Medium' },
+                                        { id: 'mix', label: 'Mix Mode' },
+                                        { id: 'custom', label: 'Custom' }
+                                    ].map((d) => (
                                         <button
-                                            key={d}
-                                            onClick={() => handleDraftChange('difficulty', d)}
+                                            key={d.id}
+                                            onClick={() => handleDraftChange('difficulty', d.id)}
                                             disabled={!isHost}
                                             className={cn(
                                                 "py-1.5 rounded text-[10px] font-bold transition-all",
-                                                draftSettings.difficulty === d
+                                                draftSettings.difficulty === d.id
                                                     ? "bg-primary text-primary-foreground shadow-lg"
                                                     : "text-gray-500 hover:text-gray-300"
                                             )}
                                         >
-                                            {d}
+                                            {d.label}
                                         </button>
                                     ))}
                                 </div>
@@ -368,16 +426,27 @@ const Room = () => {
                         <ScrollArea className="flex-1 p-3">
                             <div className="space-y-2">
                                 {messages.map((msg, i) => (
-                                    <div key={i} className={cn("flex flex-col", msg.user === user.username ? "items-end" : "items-start")}>
-                                        <div className="flex items-center gap-1.5 mb-0.5">
-                                            <span className="text-[10px] font-bold text-gray-500">{msg.user}</span>
-                                        </div>
-                                        <div className={cn(
-                                            "px-3 py-1.5 rounded-lg text-xs max-w-[90%] break-words",
-                                            msg.user === user.username ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-white/10 text-gray-200 rounded-tl-none"
-                                        )}>
-                                            {msg.message}
-                                        </div>
+                                    <div key={i} className={cn("flex flex-col",
+                                        msg.isSystem ? "items-center my-2" :
+                                            msg.user === user.username ? "items-end" : "items-start"
+                                    )}>
+                                        {msg.isSystem ? (
+                                            <span className="text-[10px] font-mono text-primary/70 bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">
+                                                {msg.message}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                    <span className="text-[10px] font-bold text-gray-500">{msg.user}</span>
+                                                </div>
+                                                <div className={cn(
+                                                    "px-3 py-1.5 rounded-lg text-xs max-w-[90%] break-words",
+                                                    msg.user === user.username ? "bg-primary text-primary-foreground rounded-tr-none" : "bg-white/10 text-gray-200 rounded-tl-none"
+                                                )}>
+                                                    {msg.message}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                 ))}
                                 <div ref={chatScrollRef} />
@@ -408,6 +477,13 @@ const Room = () => {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* INVITE MODAL */}
+            <InviteFriendsModal
+                open={showInviteModal}
+                onOpenChange={setShowInviteModal}
+                roomCode={roomCodeFromUrl}
+            />
         </div>
     );
 };

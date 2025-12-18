@@ -28,6 +28,9 @@ router.put('/', protect, async (req, res) => {
             banner
         } = req.body;
 
+        // Ensure profile object exists
+        if (!user.profile) user.profile = {};
+
         // Update Info Fields
         if (displayName !== undefined) user.profile.display_name = displayName;
         if (bio !== undefined) user.profile.bio = bio;
@@ -35,43 +38,24 @@ router.put('/', protect, async (req, res) => {
         if (discordLink !== undefined) user.profile.discord_link = discordLink;
         if (privateProfile !== undefined) user.profile.is_private = privateProfile;
 
-        // Update Visuals
+        // Update Visuals (Consolidated)
         if (avatarId !== undefined) {
-            // Basic validation: ensure it's a string
-            if (typeof avatarId !== 'string') return res.status(400).json({ message: 'Invalid avatarId format' });
-
-            // Allow null/empty to reset? Prompt says "avatarId (string OR null)"
-            // If null, we might fallback to default.
+            // Allow null/empty to reset
             if (avatarId === null) {
                 user.profile.avatarId = 'avatar_default';
             } else {
                 user.profile.avatarId = avatarId;
             }
-
-            // Sync legacy avatar_url
-            // If it is a presets ID (starts with av-), generate URL. If it's a custom URL, use it.
-            // If it's 'avatar_default', use default.
-            if (user.profile.avatarId === 'avatar_default') {
-                user.avatar_url = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`;
-            } else {
-                user.avatar_url = user.profile.avatarId.startsWith('http') || user.profile.avatarId.startsWith('data:')
-                    ? user.profile.avatarId
-                    : `https://api.dicebear.com/7.x/${(user.profile.avatarId.includes('Gamer') || user.profile.avatarId.includes('Cyber') || user.profile.avatarId.includes('Bot')) ? 'bottts' :
-                        (user.profile.avatarId.includes('Esports') || user.profile.avatarId.includes('Abstract') || user.profile.avatarId.includes('Minimal')) ? 'identicon' :
-                            user.profile.avatarId.includes('Retro') ? 'pixel-art' :
-                                'avataaars'
-                    }/svg?seed=${user.profile.avatarId}`;
-                // Note: The preset URL generation logic is also in frontend. 
-                // ideally we store the ID and frontend generates URL, or backend generates URL and saves it. 
-                // Prompt says "Backends stores... avatarId". 
-                // We are syncing `avatar_url` (legacy) for safety.
-            }
+            // Sync legacy URL
+            user.avatar_url = user.profile.avatarId.startsWith('http') || user.profile.avatarId.startsWith('data:')
+                ? user.profile.avatarId : `https://api.dicebear.com/7.x/${(user.profile.avatarId.includes('Gamer') || user.profile.avatarId.includes('Cyber') || user.profile.avatarId.includes('Bot')) ? 'bottts' : 'avataaars'}/svg?seed=${user.profile.avatarId}`;
         }
 
         if (banner !== undefined) {
-            if (!banner.type || !banner.value) return res.status(400).json({ message: 'Invalid banner format' });
-            user.profile.banner = banner;
-            user.banner_url = banner.value; // Sync legacy
+            if (banner.type && banner.value) {
+                user.profile.banner = banner;
+                user.banner_url = banner.value; // Sync legacy
+            }
         }
 
         // Sync legacy fields
@@ -91,6 +75,58 @@ router.put('/', protect, async (req, res) => {
     } catch (error) {
         console.error("Profile update error:", error);
         res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// @desc    Update avatar only
+// @route   PUT /api/profile/avatar
+// @access  Private
+router.put('/avatar', protect, async (req, res) => {
+    try {
+        const { avatarId } = req.body; // Expecting { avatarId: "string" }
+
+        if (!avatarId) return res.status(400).json({ message: "Avatar ID is required" });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        if (!user.profile) user.profile = {};
+        user.profile.avatarId = avatarId;
+
+        // Sync Legacy
+        // (Simplified generation for brevity, main logic in shared util is better but this works)
+        const isUrl = avatarId.startsWith('http') || avatarId.startsWith('data:');
+        user.avatar_url = isUrl ? avatarId : `https://api.dicebear.com/7.x/avataaars/svg?seed=${avatarId}`;
+
+        await user.save();
+        res.json({ success: true, avatarId: user.profile.avatarId });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// @desc    Update banner only
+// @route   PUT /api/profile/banner
+// @access  Private
+router.put('/banner', protect, async (req, res) => {
+    try {
+        const { banner } = req.body; // Expecting { banner: { type, value } }
+
+        if (!banner || !banner.value) return res.status(400).json({ message: "Valid banner object required" });
+
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).json({ message: "User not found" });
+
+        if (!user.profile) user.profile = {};
+        user.profile.banner = banner;
+        user.banner_url = banner.value;
+
+        await user.save();
+        res.json({ success: true, banner: user.profile.banner });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
     }
 });
 

@@ -15,6 +15,7 @@ const PRESETS = {
     quick: {
         id: 'quick',
         name: 'Quick Game',
+        description: 'Fast rounds, minimal discussion',
         icon: Zap,
         rounds: 3,
         responseTime: 20,
@@ -26,6 +27,7 @@ const PRESETS = {
     standard: {
         id: 'standard',
         name: 'Standard',
+        description: 'Balanced experience',
         icon: Users,
         rounds: 5,
         responseTime: 30,
@@ -37,6 +39,7 @@ const PRESETS = {
     competitive: {
         id: 'competitive',
         name: 'Competitive',
+        description: 'Strict rules, serious play',
         icon: Crown,
         rounds: 7,
         responseTime: 45,
@@ -51,16 +54,23 @@ const WORD_DIFFICULTIES = [
     {
         id: 'easy',
         title: 'Basic English',
-        description: 'Common words for everyone',
-        example: 'Apple / Orange',
+        description: 'Divergent words (e.g. Apple vs Car)',
+        example: 'Apple / Car',
         color: 'from-green-500/20 to-green-500/5'
     },
     {
         id: 'medium',
         title: 'Medium English',
-        description: 'Strategy & concepts',
-        example: 'Strategy / Tactic',
+        description: 'Abstract vs Concrete',
+        example: 'Democracy / Banana',
         color: 'from-blue-500/20 to-blue-500/5'
+    },
+    {
+        id: 'mix',
+        title: 'Mix Mode',
+        description: 'Basic + Medium combined',
+        example: 'Random Mix',
+        color: 'from-orange-500/20 to-orange-500/5'
     },
     {
         id: 'custom',
@@ -111,11 +121,6 @@ export const CreateRoomModal = ({ open, onOpenChange }) => {
             responseTime !== current.responseTime ||
             votingTime !== current.votingTime
         ) {
-            // If values deviate from preset, user is customizing. 
-            // We could set activePreset to 'custom' or just keep it highlighted but maybe show "modified".
-            // For simplicity, we keep the selection but maybe logic could be smarter.
-            // Let's just leave it as is, or maybe deselect if we wanted strict presets.
-            // Prompt says: "Selecting a preset auto-fills values. Users can manually override afterward."
             // Logic handled by manual input
         }
     }, [rounds, responseTime, votingTime, activePreset]);
@@ -206,14 +211,15 @@ export const CreateRoomModal = ({ open, onOpenChange }) => {
                                     key={preset.id}
                                     onClick={() => handlePresetSelect(preset.id)}
                                     className={cn(
-                                        "flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-200",
+                                        "flex flex-col items-center p-3 rounded-xl border transition-all duration-200 relative overflow-hidden group",
                                         activePreset === preset.id
-                                            ? `${preset.bg} ${preset.border} ring-1 ring-primary/50`
-                                            : "bg-background/30 border-white/5 hover:bg-white/5"
+                                            ? `${preset.bg} ${preset.border} ring-1 ring-primary/50 shadow-md transform -translate-y-0.5`
+                                            : "bg-background/30 border-white/5 hover:bg-white/5 hover:border-white/10"
                                     )}
                                 >
-                                    <preset.icon className={cn("w-5 h-5 mb-2", preset.color)} />
+                                    <preset.icon className={cn("w-5 h-5 mb-1.5 transition-transform duration-300 group-hover:scale-110", preset.color)} />
                                     <span className="text-xs font-bold">{preset.name}</span>
+                                    <span className="text-[9px] text-muted-foreground/70 text-center leading-tight mt-1">{preset.description}</span>
                                 </button>
                             ))}
                         </div>
@@ -259,28 +265,23 @@ export const CreateRoomModal = ({ open, onOpenChange }) => {
                     {/* SECTION 4: WORDS */}
                     <div className="space-y-3">
                         <Label className="uppercase text-xs font-bold text-muted-foreground tracking-wider">Word Difficulty</Label>
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
                             {WORD_DIFFICULTIES.map((diff) => (
                                 <div
                                     key={diff.id}
                                     onClick={() => setDifficulty(diff.id)}
                                     className={cn(
-                                        "relative overflow-hidden rounded-xl border p-3 cursor-pointer transition-all",
+                                        "relative overflow-hidden rounded-xl border p-3 cursor-pointer transition-all h-full",
                                         difficulty === diff.id
                                             ? "border-primary bg-primary/10"
                                             : "border-white/5 bg-background/30 hover:bg-white/5"
                                     )}
                                 >
                                     <div className={`absolute inset-0 bg-gradient-to-r ${diff.color} opacity-50`} />
-                                    <div className="relative flex justify-between items-center">
+                                    <div className="relative flex flex-col justify-between h-full gap-1">
                                         <div>
                                             <p className="font-bold text-sm text-white">{diff.title}</p>
-                                            <p className="text-xs text-gray-300 font-medium">{diff.description}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <Badge variant="outline" className="text-[10px] bg-white/10 text-white border-white/20">
-                                                {diff.example}
-                                            </Badge>
+                                            <p className="text-[10px] text-gray-300 font-medium leading-tight">{diff.description}</p>
                                         </div>
                                     </div>
                                 </div>
