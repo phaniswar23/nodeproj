@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { ThemeSwitcher } from '@/components/theme/ThemeSwitcher';
 import { cn } from '@/lib/utils';
 import { ProfileCard } from '@/components/profile/ProfileCard';
+import { getAvatarUrl } from '@/lib/avatarUtils';
 
 export const Header = () => {
     const { user, signOut } = useAuth();
@@ -108,7 +109,7 @@ export const Header = () => {
                                     </span>
                                 </div>
                                 <Avatar className="w-10 h-10 border-2 border-border group-hover:border-primary transition-colors duration-200 shadow-sm animate-idle">
-                                    <AvatarImage src={profile?.avatar_url || undefined} className="object-cover" />
+                                    <AvatarImage src={getAvatarUrl(profile || user)} className="object-cover" />
                                     <AvatarFallback className="bg-muted text-muted-foreground font-heading font-bold">
                                         {profile?.full_name?.charAt(0) || 'P'}
                                     </AvatarFallback>
