@@ -81,9 +81,9 @@ const EditProfile = () => {
     };
 
     return (
-        <div className="flex h-screen w-screen bg-[#313338] overflow-hidden">
+        <div className="flex flex-col md:flex-row min-h-screen w-full bg-[#313338] overflow-y-auto md:overflow-hidden">
             {/* LEFT PANEL: Editor Controls */}
-            <div className="w-full max-w-[500px] h-full bg-[#1e1f22] border-r border-[#111214] flex flex-col shadow-2xl z-20">
+            <div className="w-full md:w-[500px] h-auto md:h-full bg-[#1e1f22] border-r border-[#111214] flex flex-col shadow-2xl z-20 shrink-0">
                 {/* Header */}
                 <div className="p-6 border-b border-[#111214] flex items-center justify-between bg-[#111214]/50 backdrop-blur-md">
                     <div className="flex items-center gap-3">
@@ -227,7 +227,8 @@ const EditProfile = () => {
             </div>
 
             {/* RIGHT PANEL: Live Preview */}
-            <div className="flex-1 bg-[#0b0c0e] relative flex flex-col items-center justify-center p-12 overflow-hidden">
+            {/* RIGHT PANEL: Live Preview */}
+            <div className="flex-1 bg-[#0b0c0e] relative flex flex-col items-center justify-center p-8 md:p-12 overflow-hidden min-h-[500px]">
                 {/* Decorative Grid */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e1f22_1px,transparent_1px),linear-gradient(to_bottom,#1e1f22_1px,transparent_1px)] bg-[size:40px_40px] opacity-10 pointer-events-none" />
 
