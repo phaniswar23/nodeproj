@@ -80,7 +80,7 @@ export const ChatWindow = ({ friend, isOnline, onClose }) => {
     };
 
     return (
-        <div className="fixed bottom-4 right-4 w-80 h-[450px] bg-card border border-border shadow-2xl rounded-xl z-50 flex flex-col overflow-hidden animate-slide-up">
+        <div className="fixed z-50 flex flex-col overflow-hidden animate-slide-up bg-card border border-border shadow-2xl bottom-0 right-0 w-full h-[100dvh] rounded-none sm:bottom-4 sm:right-4 sm:w-80 sm:h-[450px] sm:rounded-xl">
             {/* Header */}
             <div className="p-3 bg-primary/10 border-b border-border flex items-center justify-between">
                 <div className="flex items-center gap-3">

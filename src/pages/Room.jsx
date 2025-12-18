@@ -154,10 +154,10 @@ const Room = () => {
     const allReady = players.length >= 2 && players.every(p => p.ready);
 
     return (
-        <div className="min-h-screen bg-background relative selection:bg-primary/30 pb-4 overflow-hidden flex flex-col">
+        <div className="min-h-screen bg-background relative selection:bg-primary/30 pb-4 overflow-y-auto lg:overflow-hidden flex flex-col">
             <Header />
 
-            <main className="pt-24 px-4 flex-1 container mx-auto max-w-[1400px] grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-20px)]">
+            <main className="pt-24 px-4 flex-1 container mx-auto max-w-[1400px] grid grid-cols-1 lg:grid-cols-12 gap-6 h-auto lg:h-[calc(100vh-20px)] pb-20 lg:pb-0">
 
                 {/* 1. PLAYERS PANEL */}
                 <div className="lg:col-span-3 flex flex-col gap-4 min-h-0 bg-secondary/5 rounded-2xl p-4 border border-white/5">
