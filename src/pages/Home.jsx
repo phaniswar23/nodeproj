@@ -24,17 +24,23 @@ const Home = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [joining, setJoining] = useState(false);
 
-    const handleJoinRoom = async () => {
-        if (!joinCode.trim()) return;
+    const handleJoinRoom = async (codeToJoin) => {
+        // If codeToJoin is passed (from QR), use it. Otherwise use state (from input).
+        // Since state updates are async, we prefer the passed argument if available.
+        const code = typeof codeToJoin === 'string' ? codeToJoin : joinCode;
+
+        if (!code || !code.trim()) return;
+
         setJoining(true);
         try {
-            const { data } = await api.post('/rooms/join', { joinCode: joinCode.toUpperCase() });
+            const { data } = await api.post('/rooms/join', { joinCode: code.toUpperCase() });
             navigate(`/room/${data.roomId}`);
         } catch (error) {
             toast.error(error.response?.data?.message || 'Failed to join room');
-        } finally {
-            setJoining(false);
+            setJoining(false); // Only set false on error, if success we navigate away
         }
+        // Removing finally block to prevent state update on unmounted component if nav happens fast, 
+        // though usually safe to keep. But here we only want to stop loading if it failed.
     };
 
     return (
@@ -137,7 +143,7 @@ const Home = () => {
                                     <GameButton
                                         variant="outline"
                                         className="w-full border-secondary/50 hover:bg-secondary/10 hover:text-secondary h-12 text-lg active:scale-[0.98]"
-                                        onClick={handleJoinRoom}
+                                        onClick={() => handleJoinRoom(joinCode)}
                                         disabled={!joinCode || joining}
                                     >
                                         {joining ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Joining...</> : 'Join Lobby'}
@@ -148,12 +154,11 @@ const Home = () => {
                                     <QRScanner
                                         onScan={(code) => {
                                             if (code) {
-                                                // Assuming the QR code is just the room code or a URL ending in the code
-                                                // Simple extraction if it's a URL, otherwise take as is
                                                 const extractedCode = code.split('/').pop().toUpperCase().slice(0, 6);
+                                                // Update state just in case, but scan should trigger join
                                                 setJoinCode(extractedCode);
-                                                setJoinMode('code');
-                                                toast.success('Room code scanned!');
+                                                toast.info(`Found code: ${extractedCode}, joining...`);
+                                                handleJoinRoom(extractedCode);
                                             }
                                         }}
                                         onError={(error) => {
