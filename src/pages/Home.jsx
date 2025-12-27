@@ -14,10 +14,13 @@ import { CursorEffect } from '@/components/ui/CursorEffect';
 import { cn } from '@/lib/utils';
 
 
+import { QRScanner } from '@/components/game/QRScanner';
+
 const Home = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const [joinCode, setJoinCode] = useState('');
+    const [joinMode, setJoinMode] = useState('code'); // 'code' | 'scan'
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [joining, setJoining] = useState(false);
 
@@ -97,24 +100,70 @@ const Home = () => {
                         </div>
 
                         <h3 className="text-3xl font-bold font-heading mb-3 tracking-wide">Join Room</h3>
-                        <p className="text-muted-foreground mb-8 text-base leading-relaxed">Enter a game code to join an existing lobby instantly.</p>
+                        <p className="text-muted-foreground mb-8 text-base leading-relaxed">Enter a game code or scan a QR code to join instantly.</p>
 
-                        <div className="w-full space-y-4 relative z-10">
-                            <GameInput
-                                placeholder="ENTER CODE"
-                                className="text-center uppercase text-2xl font-bold tracking-[0.2em] h-14 dashed-border bg-background/50 focus:bg-background/80 transition-all border-secondary/30 focus:border-secondary"
-                                value={joinCode}
-                                onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                                maxLength={6}
-                            />
-                            <GameButton
-                                variant="outline"
-                                className="w-full border-secondary/50 hover:bg-secondary/10 hover:text-secondary h-12 text-lg active:scale-[0.98]"
-                                onClick={handleJoinRoom}
-                                disabled={!joinCode || joining}
-                            >
-                                {joining ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Joining...</> : 'Join Lobby'}
-                            </GameButton>
+                        <div className="w-full relative z-10">
+                            {/* Toggle Switch */}
+                            <div className="flex bg-secondary/10 p-1 rounded-lg mb-6">
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 text-sm font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2",
+                                        joinMode === 'code' ? "bg-secondary text-secondary-foreground shadow-md" : "text-muted-foreground hover:bg-secondary/20"
+                                    )}
+                                    onClick={() => setJoinMode('code')}
+                                >
+                                    Enter Code
+                                </button>
+                                <button
+                                    className={cn(
+                                        "flex-1 py-2 text-sm font-bold uppercase tracking-wider rounded-md transition-all flex items-center justify-center gap-2",
+                                        joinMode === 'scan' ? "bg-secondary text-secondary-foreground shadow-md" : "text-muted-foreground hover:bg-secondary/20"
+                                    )}
+                                    onClick={() => setJoinMode('scan')}
+                                >
+                                    Scan QR
+                                </button>
+                            </div>
+
+                            {joinMode === 'code' ? (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <GameInput
+                                        placeholder="ENTER CODE"
+                                        className="text-center uppercase text-2xl font-bold tracking-[0.2em] h-14 dashed-border bg-background/50 focus:bg-background/80 transition-all border-secondary/30 focus:border-secondary"
+                                        value={joinCode}
+                                        onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                                        maxLength={6}
+                                    />
+                                    <GameButton
+                                        variant="outline"
+                                        className="w-full border-secondary/50 hover:bg-secondary/10 hover:text-secondary h-12 text-lg active:scale-[0.98]"
+                                        onClick={handleJoinRoom}
+                                        disabled={!joinCode || joining}
+                                    >
+                                        {joining ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Joining...</> : 'Join Lobby'}
+                                    </GameButton>
+                                </div>
+                            ) : (
+                                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                    <QRScanner
+                                        onScan={(code) => {
+                                            if (code) {
+                                                // Assuming the QR code is just the room code or a URL ending in the code
+                                                // Simple extraction if it's a URL, otherwise take as is
+                                                const extractedCode = code.split('/').pop().toUpperCase().slice(0, 6);
+                                                setJoinCode(extractedCode);
+                                                setJoinMode('code');
+                                                toast.success('Room code scanned!');
+                                            }
+                                        }}
+                                        onError={(error) => {
+                                            console.error(error);
+                                            toast.error('Could not access camera');
+                                        }}
+                                    />
+                                    <p className="text-xs text-muted-foreground">Make sure you have granted camera permissions.</p>
+                                </div>
+                            )}
                         </div>
                     </GlassCard>
                 </div>

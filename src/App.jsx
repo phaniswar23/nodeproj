@@ -13,6 +13,7 @@ import Auth from "./pages/Auth";
 import Profile from "./pages/Profile";
 import Friends from "./pages/Friends";
 import Room from "./pages/Room";
+import Game from "./pages/Game";
 import Notifications from "./pages/Notifications";
 import ResetPassword from "./pages/ResetPassword";
 import TestConnection from "./pages/TestConnection";
@@ -71,6 +72,7 @@ const AppRoutes = () => (
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
         <Route path="/room/:roomId" element={<ProtectedRoute><Room /></ProtectedRoute>} />
+        <Route path="/game/:roomId" element={<ProtectedRoute><Game /></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
         <Route path="/test-connection" element={<TestConnection />} />
         <Route path="/reset-password" element={<ResetPassword />} />

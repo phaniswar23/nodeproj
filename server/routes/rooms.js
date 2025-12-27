@@ -131,7 +131,7 @@ router.post('/join', protect, async (req, res) => {
         // Check if already joined
         const existingPlayer = await RoomPlayer.findOne({ room_id: room._id, user_id: req.user._id });
         if (existingPlayer) {
-            return res.json({ roomId: room._id });
+            return res.json({ roomId: room.join_code });
         }
 
         // Create player
@@ -151,7 +151,7 @@ router.post('/join', protect, async (req, res) => {
             io.to(room._id.toString()).emit('room_update');
         }
 
-        res.json({ roomId: room._id });
+        res.json({ roomId: room.join_code });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: error.message });
